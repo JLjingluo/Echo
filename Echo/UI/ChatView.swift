@@ -299,25 +299,34 @@ struct ModelSelectorView: View {
 
     var body: some View {
         Button(action: onOpen) {
-            HStack(alignment: .bottom, spacing: 5) {
-                Text(version.isEmpty ? "选择厂商" : version)
-                    .font(.body)
+            HStack(alignment: .lastTextBaseline, spacing: 5) {
+                Text(selected.isEmpty ? "选择模型" : selected)
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundColor(Color(.label))
                     .lineLimit(1)
-                Text(selected)
-                    .font(.subheadline)
+                    .truncationMode(.middle)
+                Text(shortVendor)
+                    .font(.system(size: 13))
                     .foregroundColor(Ench.secondaryText)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .showIf(!shortVendor.isEmpty)
                 Image(systemName: "chevron.down")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 10)
+                    .frame(width: 9)
                     .foregroundColor(Color(.label))
             }
+            .frame(maxWidth: 240)
             .contentShape(Rectangle())
         }
         .buttonStyle(GrowingButton())
+        .layoutPriority(1)
         .accessibilityLabel("厂商与模型")
+    }
+
+    private var shortVendor: String {
+        version.components(separatedBy: CharacterSet(charactersIn: " (（")).first ?? version
     }
 }
 

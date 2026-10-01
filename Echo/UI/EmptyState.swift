@@ -130,7 +130,7 @@ struct EmptyState: View {
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 Text(s.text)
-                    .font(.system(size: 15))
+                    .font(.system(size: 16))
                     .foregroundStyle(Ench.text)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
@@ -143,7 +143,7 @@ struct EmptyState: View {
                         .accessibilityHidden(true)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 104, alignment: .leading)
             .padding(15)
             .background(Color.gray5Custom, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay {

@@ -56,7 +56,7 @@ enum Ench {
     static var brandGradient: LinearGradient {
         LinearGradient(colors: brand, startPoint: .leading, endPoint: .trailing)
     }
-    static let body = CGFloat(14)
+    static let body = CGFloat(16)
 }
 
 struct GrowingButton: ButtonStyle {

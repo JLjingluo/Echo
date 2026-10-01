@@ -475,7 +475,7 @@ struct WorkGroupHeader: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Text(text)
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundStyle(Ench.secondaryText)
                     .lineLimit(1)
                 Image(systemName: chevronUp ? "chevron.up" : "chevron.right")

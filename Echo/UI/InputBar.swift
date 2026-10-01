@@ -101,7 +101,6 @@ struct InputBar: View {
                     .buttonStyle(PlainButtonStyle())
                 }
                 .padding(.horizontal)
-                .frame(maxHeight: .infinity, alignment: .center)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
                         .strokeBorder(
