@@ -106,6 +106,12 @@ struct EchoIcon: View {
     var size: CGFloat = 20
     var weight: Font.Weight = .regular
 
+    init(_ name: String, size: CGFloat = 20, weight: Font.Weight = .regular) {
+        self.name = name
+        self.size = size
+        self.weight = weight
+    }
+
     var body: some View {
         Image(systemName: name)
             .font(.system(size: size, weight: weight))

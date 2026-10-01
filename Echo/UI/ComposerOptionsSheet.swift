@@ -24,7 +24,7 @@ struct ComposerOptionsSheet: View {
                     EchoSurface {
                         VStack(spacing: 0) {
                             toggleRow("语音输入", icon: app.voice.listening ? "stop.circle.fill" : "mic",
-                                      on: nil, action: onVoice)
+                                      value: nil, action: onVoice)
                             Divider().padding(.leading, 52)
                             row("粘贴板", icon: "doc.on.clipboard", value: nil, action: onPaste)
                             Divider().padding(.leading, 52)

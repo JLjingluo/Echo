@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct WorkspaceView: View {
     @Environment(\.dismiss) private var dismiss
@@ -181,6 +182,7 @@ struct FilePreviewView: View {
     @State private var note = ""
 
     var url: URL { URL(fileURLWithPath: file.path) }
+    var isWeb: Bool { ["html", "htm", "svg", "xml"].contains(file.ext) }
 
     var body: some View {
         NavigationStack {
@@ -192,6 +194,9 @@ struct FilePreviewView: View {
                             .scaledToFit()
                             .frame(maxWidth: .infinity)
                     }
+                } else if isWeb {
+                    WebPreview(url: url)
+                        .id(url)
                 } else {
                     TextEditor(text: $text)
                         .font(.system(size: 13.5, design: .monospaced))
@@ -199,7 +204,7 @@ struct FilePreviewView: View {
                         .onChange(of: text) { _, _ in dirty = true }
                 }
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, isWeb ? 0 : 6)
             .navigationTitle(file.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -253,6 +258,21 @@ struct FilePreviewView: View {
         dirty = false
         note = "已保存"
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { note = "" }
+    }
+}
+
+struct WebPreview: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> WKWebView {
+        let v = WKWebView()
+        v.isOpaque = false
+        v.backgroundColor = .systemBackground
+        return v
+    }
+
+    func updateUIView(_ v: WKWebView, context: Context) {
+        v.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
     }
 }
 

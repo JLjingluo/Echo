@@ -24,9 +24,9 @@ struct MarkerRow: View {
     let title: String
     var symbol: String = "hammer"
     var expanded: Bool?
-    var accessory: String?
     var failed: Bool = false
     var live: Bool = false
+    var accessory: String?
 
     var body: some View {
         HStack(spacing: 8) {

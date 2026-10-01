@@ -202,7 +202,7 @@ struct ModelPickerSheet: View {
         do {
             let list = try await ModelCatalog.fetch(base: app.settings.trimmedBaseURL,
                                                     provider: app.settings.provider, key: key)
-            ModelCatalog.save(vendorID: app.settings.vendorID, models: list)
+            ModelCatalog.save(vendorID: app.settings.vendorID, list)
             fetched = list
             fetchedAt = .now
         } catch {
@@ -218,7 +218,7 @@ struct ModelPickerSheet: View {
     }
 
     static func explain(_ e: Error) -> String {
-        if case let ChatError.http(code, body) = e as? ChatError {
+        if case let .http(code, body)? = e as? ChatError {
             let b = body.lowercased()
             switch code {
             case 401, 403:

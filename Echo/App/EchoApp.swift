@@ -62,109 +62,86 @@ struct EchoApp: App {
 
 struct OnboardView: View {
     @Environment(AppState.self) private var app
+    @Environment(\.colorScheme) private var scheme
     var onDone: () -> Void
-    @State private var picked = "deepseek"
-    @State private var key = ""
-    @State private var showKey = false
+    @State private var showModel = false
 
     var body: some View {
         @Bindable var app = app
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 8) {
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
                         Text("Echo")
-                            .font(.system(size: 34, weight: .heavy, design: .rounded)).italic()
-                        Text("手机本地的 AI 工作台。\n不上传文件、不经过我们的服务器，你的 Key 直连模型厂商。")
-                            .font(.system(size: 15))
+                            .font(EchoFont.wordmark(30))
+                            .foregroundStyle(EchoTheme.primaryText(scheme))
+                        Text("跑在你自己手机上：不上传文件、不经过我们的服务器，你的 Key 直连模型厂商。")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
-                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.top, 30)
+                    .padding(.vertical, 6)
+                }
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("1. 选厂商").font(.system(size: 15, weight: .semibold))
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                            ForEach(vendorPresets.filter { $0.id != "custom" }) { v in
-                                Button {
-                                    picked = v.id
-                                    app.apply(v)
-                                } label: {
-                                    HStack {
-                                        Text(v.name).font(.system(size: 14.5, weight: .medium))
-                                            .lineLimit(1)
-                                            .minimumScaleFactor(0.8)
-                                        Spacer()
-                                        if picked == v.id {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(Theme.accent)
-                                        }
-                                    }
-                                    .padding(.horizontal, 12).padding(.vertical, 13)
-                                    .background(picked == v.id ? Color.primary.opacity(0.07) : Color(hex: "F6F6F8"),
-                                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("2. 粘贴 API Key").font(.system(size: 15, weight: .semibold))
+                Section("1. 厂商与 Key") {
+                    Button { showModel = true } label: {
                         HStack {
-                            Group {
-                                if showKey {
-                                    TextField("sk-...", text: $key)
-                                } else {
-                                    SecureField("sk-...", text: $key)
-                                }
-                            }
-                            .font(.system(size: 15, design: .monospaced))
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            Button { showKey.toggle() } label: {
-                                Image(systemName: showKey ? "eye.slash" : "eye")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(12)
-                        .background(Color(hex: "F6F6F8"),
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        if let v = findPreset(picked), !v.keyURL.isEmpty {
-                            Link(v.keyURL, destination: URL(string: v.keyURL)!)
-                                .font(.system(size: 13))
+                            Text("厂商与模型")
+                            Spacer()
+                            Text(app.settings.model.isEmpty ? app.vendorName : "\(app.vendorName) · \(app.settings.model)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
                     }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("3. 挑模型").font(.system(size: 15, weight: .semibold))
-                        FlowChips(items: app.vendor?.models ?? [], selection: $app.settings.model)
+                    HStack {
+                        Group {
+                            if app.apiKey.isEmpty {
+                                TextField("粘贴 API Key", text: $app.apiKey)
+                            } else {
+                                SecureField("API Key", text: $app.apiKey)
+                            }
+                        }
+                        .font(.system(.subheadline, design: .monospaced))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: app.apiKey) { _, _ in app.saveKey() }
                     }
+                    if let v = app.vendor, !v.keyURL.isEmpty {
+                        Link(destination: URL(string: v.keyURL)!) {
+                            HStack(spacing: 6) {
+                                EchoIcon("arrow.up.right.square", size: 14)
+                                Text("去 \(v.name) 控制台创建 Key")
+                            }
+                            .font(.footnote)
+                        }
+                    }
+                    if let v = app.vendor, !v.note.isEmpty {
+                        Text(v.note).font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
 
-                    Button {
-                        app.apiKey = key.trimmed
+                Section {
+                    EchoGlassButton("开始使用", style: .prominent) {
+                        app.apiKey = app.apiKey.trimmed
                         app.saveKey()
                         app.save()
                         onDone()
-                    } label: {
-                        Text(key.trimmed.isEmpty ? "先跳过，进设置再填" : "开始使用")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.black, in: Capsule())
                     }
-                    .buttonStyle(.plain)
-                    .padding(.top, 6)
-                    Spacer(minLength: 30)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                } footer: {
+                    Text("Key 只存本机钥匙串，切厂商不会丢。没 Key 也可以先跳过，进去后随时填。")
                 }
-                .padding(.horizontal, 22)
             }
+            .navigationTitle("欢迎")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("跳过") { onDone() }.foregroundStyle(.secondary)
                 }
             }
+            .sheet(isPresented: $showModel) { ModelPickerSheet() }
         }
     }
 }

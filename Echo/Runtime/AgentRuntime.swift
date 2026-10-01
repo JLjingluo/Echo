@@ -394,7 +394,7 @@ final class AgentRuntime {
     }
 
     static func isToolRejection(_ e: Error) -> Bool {
-        guard case let ChatError.http(code, body) = e as? ChatError, (400...499).contains(code) else {
+        guard case let .http(code, body)? = e as? ChatError, (400...499).contains(code) else {
             return false
         }
         let b = body.lowercased()

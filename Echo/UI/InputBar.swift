@@ -43,7 +43,7 @@ struct InputBar: View {
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.image],
                       allowsMultipleSelection: true) { result in
-            if case let .ok(urls) = result { importFiles(urls) }
+            if case let .success(urls) = result { importFiles(urls) }
         }
         .sheet(isPresented: $showOptions) {
             ComposerOptionsSheet(onPhotos: { picking = true },
