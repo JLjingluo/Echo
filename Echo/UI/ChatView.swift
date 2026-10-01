@@ -194,8 +194,18 @@ struct ChatView: View {
                 onSaveCode: saveCode,
                 onOpenFile: { previewFile = $0 },
                 onEdit: { editingText = $0.text; draft = $0.text },
+                onRegenerate: regenerate,
                 onSpeak: { speak($0) })
     }
+
+    private func regenerate() {
+        guard !runtime.isBusy else { return }
+        let ms = session.orderedMessages
+        guard let idx = ms.lastIndex(where: { $0.role == .user }) else { return }
+        let goal = ms[idx].text
+        for m in ms[idx...] { context.delete(m) }
+        try? context.save()
+        send(goal: goal, images: [], truncating: nil)
 
     @ViewBuilder
     private func groupRow(_ g: WorkGroup) -> some View {

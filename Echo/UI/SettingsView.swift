@@ -16,30 +16,6 @@ struct SettingsView: View {
         @Bindable var app = app
         NavigationStack {
             Form {
-                Section("模型厂商") {
-                    ForEach(Array(vendorPresets.enumerated()), id: \.offset) { _, v in
-                        Button {
-                            app.apply(v)
-                            note = "已切到 \(v.name)"
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(v.name).font(.system(size: 16, weight: .medium))
-                                        .foregroundStyle(.primary)
-                                    Text(v.baseURL.isEmpty ? "自己填 Base URL" : v.baseURL)
-                                        .font(.system(size: 11.5)).foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                                if app.settings.vendorID == v.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(Theme.accent)
-                                }
-                            }
-                        }
-                    }
-                }
-
                 Section {
                     HStack {
                         Group {

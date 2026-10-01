@@ -6,6 +6,7 @@ struct ItemRow: View {
     var onSaveCode: (String, String) -> Void = { _, _ in }
     var onOpenFile: (RunFile) -> Void = { _ in }
     var onEdit: (RunItem) -> Void = { _ in }
+    var onRegenerate: () -> Void = {}
     var onSpeak: (String) -> Void = { _ in }
 
     var body: some View {
@@ -38,6 +39,7 @@ struct ItemRow: View {
         }
         if item.kind == .user {
             Button { onEdit(item) } label: { Label("编辑", systemImage: "pencil") }
+            Button(action: onRegenerate) { Label("重新生成", systemImage: "arrow.clockwise") }
         }
     }
 }
