@@ -233,8 +233,9 @@ struct ChatView: View {
         let text = timeline.filter { $0.kind == .text && !$0.isReasoning }.map(\.text)
             .joined(separator: "\n\n")
         var items: [Any] = [text.isEmpty ? "（空）" : text]
-        items.append(contentsOf: files.map { URL(fileURLWithPath: $0.path) }
-            .filter { FileManager.default.fileExists(atPath: $0.path) })
+        let urls: [URL] = files.map { URL(fileURLWithPath: $0.path) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        items.append(contentsOf: urls)
         ShareHelper.share(items: items)
     }
 

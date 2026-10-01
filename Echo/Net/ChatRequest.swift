@@ -221,7 +221,9 @@ enum JSONHelper {
     }
 
     static func string(_ json: String) -> String {
-        String(data: JSONSerialization.data(withJSONObject: [json]), encoding: .utf8) ?? "\"\(json)\""
+        guard let d = try? JSONSerialization.data(withJSONObject: [json]),
+              let s = String(data: d, encoding: .utf8) else { return "\"\(json)\"" }
+        return s
     }
 
     static func pretty(_ json: String) -> String {

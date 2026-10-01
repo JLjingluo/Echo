@@ -43,8 +43,10 @@ struct CopyLabel: View {
             Notifier.shared.tap()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
         } label: {
-            Label(copied ? "已复制" : "", systemImage: copied ? "checkmark" : systemImage)
-                .labelStyle(.titleAndIcon)
+            HStack(spacing: 3) {
+                Image(systemName: copied ? "checkmark" : systemImage)
+                if copied { Text("已复制") }
+            }
                 .font(.caption)
         }
         .buttonStyle(.borderless)

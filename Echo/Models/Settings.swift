@@ -82,7 +82,7 @@ struct AppSettings: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func d<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
-            guard let box = try? c.decodeIfPresent(T.self, forKey: key), let v = box else { return fallback }
+            guard let v = try? c.decode(T.self, forKey: key) else { return fallback }
             return v
         }
         vendorID = d(.vendorID, "deepseek")

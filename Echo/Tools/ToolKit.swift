@@ -8,7 +8,7 @@ enum ToolOutcome {
         switch self {
         case .text(let s): return s
         case .file(let n, let u, let b, _, let a, let r):
-            return "已写入 \(n)（\(sizeText(b))，+\(a) −\(r) 行），路径 \(u.path)"
+            return "已写入 \(n)（\(Self.sizeText(b))，+\(a) −\(r) 行），路径 \(u.path)"
         }
     }
 
@@ -249,7 +249,7 @@ enum ToolKit {
                 if aText.isEmpty && bText.isEmpty { return .text("两段都是空的，先给 a/b 或 a_name/b_name") }
                 return .text(TextOps.diff(aText, bText))
             case .run_js:
-                let out = ScriptRunner.run(a.s("code"), input: a.s("input"))
+                let out = await ScriptRunner.run(a.s("code"), input: a.s("input"))
                 return .text(out.clamped(20_000))
             case .web_fetch:
                 let r = try await WebOps.fetch(a.s("url"), maxChars: a.i("max_chars", 8000))
