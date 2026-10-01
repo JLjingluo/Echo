@@ -3,7 +3,6 @@ import SwiftUI
 struct ModelPickerSheet: View {
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var scheme
 
     @State private var query = ""
     @State private var showAll = false
@@ -18,150 +17,20 @@ struct ModelPickerSheet: View {
         if !showAll { list = list.filter { ModelCatalog.isChatModel($0.id) } }
         let q = query.trimmed.lowercased()
         if !q.isEmpty { list = list.filter { $0.id.lowercased().contains(q) } }
-        if !app.settings.model.isEmpty, !list.contains(where: { $0.id == app.settings.model }) {
-            list.insert(ModelEntry(id: app.settings.model), at: 0)
+        let current = app.settings.model
+        if !current.isEmpty, !list.contains(where: { $0.id == current }) {
+            list.insert(ModelEntry(id: current), at: 0)
         }
         return list
     }
 
-    private var presetNames: [String] { app.vendor?.models ?? [] }
-
     var body: some View {
-        @Bindable var app = app
         NavigationStack {
             List {
-                Section("厂商") {
-                    ForEach(vendorPresets) { v in
-                        SelectionRow(title: v.name,
-                                     detail: v.baseURL.isEmpty ? "自己填 Base URL" : v.baseURL,
-                                     isSelected: app.settings.vendorID == v.id) {
-                            app.apply(v)
-                            reloadCache()
-                        }
-                    }
-                }
-
-                Section {
-                    HStack(spacing: 10) {
-                        EchoIcon("key.horizontal", size: 16).foregroundStyle(.secondary)
-                        Group {
-                            if app.apiKey.isEmpty {
-                                TextField("粘贴这个厂商的 API Key", text: $app.apiKey)
-                            } else {
-                                SecureField("API Key", text: $app.apiKey)
-                            }
-                        }
-                        .font(.system(.subheadline, design: .monospaced))
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onChange(of: app.apiKey) { _, _ in app.saveKey() }
-                        if !app.apiKey.isEmpty {
-                            Button { app.apiKey = ""; app.saveKey() } label: {
-                                EchoIcon("xmark.circle.fill", size: 16).foregroundStyle(.tertiary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    if let v = app.vendor, !v.keyURL.isEmpty {
-                        Link(destination: URL(string: v.keyURL)!) {
-                            HStack(spacing: 6) {
-                                EchoIcon("arrow.up.right.square", size: 14)
-                                Text("去 \(v.name) 控制台创建 Key")
-                            }
-                            .font(.footnote)
-                        }
-                    }
-                    if let v = app.vendor, !v.note.isEmpty {
-                        Text(v.note).font(.footnote).foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("API Key（只存本机钥匙串）")
-                }
-
-                Section {
-                    HStack(spacing: 10) {
-                        Button {
-                            Task { await load() }
-                        } label: {
-                            HStack(spacing: 6) {
-                                if loading {
-                                    ProgressView().controlSize(.small)
-                                    Text("读取中…")
-                                } else {
-                                    EchoIcon("arrow.clockwise", size: 14)
-                                    Text(fetched.isEmpty ? "读取模型列表" : "重新读取")
-                                }
-                            }
-                            .font(.subheadline.weight(.medium))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(loading)
-                        Spacer()
-                        if let at = fetchedAt {
-                            Text(at, style: .time)
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-
-                    Toggle("显示非对话模型（图形/语音/向量）", isOn: $showAll)
-                        .font(.subheadline)
-
-                    if !note.isEmpty {
-                        Text(note).font(.footnote).foregroundStyle(.red)
-                    }
-
-                    if visible.isEmpty && !loading {
-                        Text(presetNames.isEmpty
-                             ? "还没有模型。填好 Key 点上面「读取模型列表」。"
-                             : "还没读取，先显示内置的 \(presetNames.count) 个。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        ForEach(presetNames, id: \.self) { name in
-                            SelectionRow(title: name, detail: "",
-                                         isSelected: app.settings.model == name) {
-                                pick(name)
-                            }
-                        }
-                    } else {
-                        ForEach(visible) { m in
-                            SelectionRow(title: m.id,
-                                         detail: NoToolMemory.contains(m.id)
-                                            ? "\(m.owner) · 曾被记为不能调工具，选它即清除" : m.owner,
-                                         isSelected: app.settings.model == m.id) {
-                                pick(m.id)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("模型（\(visible.count)）")
-                } footer: {
-                    Text("读取走的是厂商自己的 /models 接口，不经过任何第三方。")
-                }
-
-                Section("手动填模型名") {
-                    HStack {
-                        TextField("例如 gpt-4o-mini", text: $manual)
-                            .font(.system(.subheadline, design: .monospaced))
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        Button("用这个") {
-                            let m = manual.trimmed
-                            if !m.isEmpty { pick(m) }
-                        }
-                        .disabled(manual.trimmed.isEmpty)
-                    }
-                    LabeledContent("接口地址（Base URL）") {
-                        TextField("", text: $app.settings.baseURL, prompt: Text("https://..."))
-                            .multilineTextAlignment(.trailing)
-                            .font(.system(.caption, design: .monospaced))
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    }
-                } footer: {
-                    Text("接口地址只支持 https。填 http 会被系统直接拦掉，报出来就是「连不上厂商」。")
-                }
+                vendorSection
+                keySection
+                modelSection
+                manualSection
             }
             .searchable(text: $query, prompt: "搜模型")
             .listStyle(.insetGrouped)
@@ -174,6 +43,169 @@ struct ModelPickerSheet: View {
             }
         }
         .onAppear(perform: start)
+    }
+
+    @ViewBuilder private var vendorSection: some View {
+        Section("厂商") {
+            ForEach(vendorPresets) { v in
+                SelectionRow(title: v.name,
+                             detail: v.baseURL.isEmpty ? "自己填接口地址" : v.baseURL,
+                             isSelected: app.settings.vendorID == v.id) {
+                    applyVendor(v)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var keySection: some View {
+        @Bindable var app = app
+        Section {
+            keyField
+            if let url = URL(string: app.vendor?.keyURL ?? "") {
+                Link(destination: url) {
+                    HStack(spacing: 6) {
+                        EchoIcon("arrow.up.right.square", size: 14)
+                        Text("去 \(app.vendorName) 控制台创建 Key")
+                    }
+                    .font(.footnote)
+                }
+            }
+            if let n = app.vendor?.note, !n.isEmpty {
+                Text(n).font(.footnote).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("API Key（只存本机钥匙串）")
+        }
+    }
+
+    @ViewBuilder private var keyField: some View {
+        @Bindable var app = app
+        HStack(spacing: 10) {
+            EchoIcon("key.horizontal", size: 16).foregroundStyle(.secondary)
+            Group {
+                if app.apiKey.isEmpty {
+                    TextField("粘贴这个厂商的 API Key", text: $app.apiKey)
+                } else {
+                    SecureField("API Key", text: $app.apiKey)
+                }
+            }
+            .font(.system(.subheadline, design: .monospaced))
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .onChange(of: app.apiKey) { _, _ in app.saveKey() }
+            if !app.apiKey.isEmpty {
+                Button { clearKey() } label: {
+                    EchoIcon("xmark.circle.fill", size: 16).foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder private var modelSection: some View {
+        Section {
+            fetchRow
+            Toggle("显示非对话模型（图形/语音/向量）", isOn: $showAll)
+                .font(.subheadline)
+            if !note.isEmpty {
+                Text(note).font(.footnote).foregroundStyle(.red)
+            }
+            modelRows
+        } header: {
+            Text("模型（\(visible.count)）")
+        } footer: {
+            Text("读取走的是厂商自己的 /models 接口，不经过任何第三方。")
+        }
+    }
+
+    @ViewBuilder private var fetchRow: some View {
+        HStack(spacing: 10) {
+            Button { Task { await load() } } label: {
+                HStack(spacing: 6) {
+                    if loading {
+                        ProgressView().controlSize(.small)
+                        Text("读取中…")
+                    } else {
+                        EchoIcon("arrow.clockwise", size: 14)
+                        Text(fetched.isEmpty ? "读取模型列表" : "重新读取")
+                    }
+                }
+                .font(.subheadline.weight(.medium))
+            }
+            .buttonStyle(.plain)
+            .disabled(loading)
+            Spacer()
+            if let at = fetchedAt {
+                Text(at, style: .time).font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    @ViewBuilder private var modelRows: some View {
+        if visible.isEmpty && !loading {
+            Text(presetNames.isEmpty
+                 ? "还没有模型。填好 Key 点上面「读取模型列表」。"
+                 : "还没读取，先显示内置的 \(presetNames.count) 个。")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            ForEach(presetNames, id: \.self) { name in
+                SelectionRow(title: name, detail: "",
+                             isSelected: app.settings.model == name) { pick(name) }
+            }
+        } else {
+            ForEach(visible) { m in
+                SelectionRow(title: m.id, detail: detailText(m),
+                             isSelected: app.settings.model == m.id) { pick(m.id) }
+            }
+        }
+    }
+
+    @ViewBuilder private var manualSection: some View {
+        @Bindable var app = app
+        Section("手动填模型名") {
+            HStack {
+                TextField("例如 gpt-4o-mini", text: $manual)
+                    .font(.system(.subheadline, design: .monospaced))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                Button { useManual() } label: { Text("用这个") }
+                    .disabled(manual.trimmed.isEmpty)
+            }
+            LabeledContent("接口地址（Base URL）") {
+                TextField("", text: $app.settings.baseURL, prompt: Text("https://..."))
+                    .multilineTextAlignment(.trailing)
+                    .font(.system(.caption, design: .monospaced))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+        } footer: {
+            Text("接口地址只支持 https。填 http 会被系统直接拦掉，报出来就是「连不上厂商」。")
+        }
+    }
+
+    private var presetNames: [String] { app.vendor?.models ?? [] }
+
+    private func detailText(_ m: ModelEntry) -> String {
+        if NoToolMemory.contains(m.id) {
+            return m.owner.isEmpty ? "曾被记为不能调工具，选它即清除"
+                : "\(m.owner) · 曾被记为不能调工具，选它即清除"
+        }
+        return m.owner
+    }
+
+    private func applyVendor(_ v: VendorPreset) {
+        app.apply(v)
+        reloadCache()
+    }
+
+    private func clearKey() {
+        app.apiKey = ""
+        app.saveKey()
+    }
+
+    private func useManual() {
+        let m = manual.trimmed
+        if !m.isEmpty { pick(m) }
     }
 
     private func start() {
@@ -229,7 +261,7 @@ struct ModelPickerSheet: View {
             case 401, 403:
                 return "Key 不对或没权限（\(code)）。检查有没有多复制空格、是不是这个厂商的 Key。"
             case 404:
-                return "这个 Base URL 没有模型列表接口（404）。可以手动填模型名。"
+                return "这个接口地址没有模型列表接口（404）。可以手动填模型名。"
             default:
                 if b.contains("invalid_api_key") || b.contains("apikey") {
                     return "厂商说 Key 无效。重新粘贴一次试试。"
@@ -237,7 +269,7 @@ struct ModelPickerSheet: View {
                 return "读取失败（\(code)）：" + body.clamped(160)
             }
         }
-        if e is URLError { return "连不上厂商，检查网络或 Base URL。" }
+        if e is URLError { return "连不上厂商，检查网络或接口地址。" }
         return "读取失败：" + e.localizedDescription.clamped(160)
     }
 }
