@@ -56,10 +56,11 @@ struct AppSettings: Codable, Equatable {
     var maxTokens: Int = 4096
     var systemPrompt: String = AppSettings.defaultSystemPrompt
     var stream: Bool = true
-    var autoApprove: Bool = true
+    var autoApprove: Bool = false
     var deepThink: Bool = false
     var historyLimit: Int = 40
-    var enabledTools: [String] = ToolID.allCases.map { $0.rawValue }
+    var enabledTools: [String] = ToolID.allCases.map(\.rawValue)
+        .filter { $0 != ToolID.delete_file.rawValue }
     var maxTurnsPerStep: Int = 6
     var autoExport: Bool = false
     var haptics: Bool = true
@@ -96,10 +97,11 @@ struct AppSettings: Codable, Equatable {
         maxTokens = d(.maxTokens, 4096)
         systemPrompt = d(.systemPrompt, Self.defaultSystemPrompt)
         stream = d(.stream, true)
-        autoApprove = d(.autoApprove, true)
+        autoApprove = d(.autoApprove, false)
         deepThink = d(.deepThink, false)
         historyLimit = d(.historyLimit, 40)
-        enabledTools = d(.enabledTools, ToolID.allCases.map { $0.rawValue })
+        enabledTools = d(.enabledTools, ToolID.allCases.map(\.rawValue)
+            .filter { $0 != ToolID.delete_file.rawValue })
         maxTurnsPerStep = d(.maxTurnsPerStep, 6)
         autoExport = d(.autoExport, false)
         haptics = d(.haptics, true)

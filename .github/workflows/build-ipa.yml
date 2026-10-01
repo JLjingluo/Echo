@@ -154,13 +154,12 @@ jobs:
           gh release upload "$TAG" "out/${IPA_NAME}" --clobber
           gh release edit "$TAG" --title "Echo ${IPA_VER} · build ${IPA_BUILD}" --prerelease
           LINK="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${IPA_NAME}"
-          gh release view "$TAG" --json assets \
-            | python3 -c 'import json,sys
-          a = json.load(sys.stdin)["assets"]
-          for x in a[:-5]:
-              print(x["databaseId"])' \
+          gh release view "$TAG" --json assets -q '.assets[].databaseId' \
+            | awk -v keep=5 '{ a[NR] = $0 } END { for (i = 1; i <= NR - keep; i++) print a[i] }' \
             | while read -r id; do
-                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/$id" >/dev/null 2>&1 || true
+                if [ -n "$id" ]; then
+                  gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/$id" >/dev/null 2>&1 || true
+                fi
               done
           echo "本次包：${IPA_NAME}"
           echo "$LINK"

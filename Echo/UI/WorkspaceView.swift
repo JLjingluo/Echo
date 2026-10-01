@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import QuickLook
 
 struct WorkspaceView: View {
     @Environment(\.dismiss) private var dismiss
@@ -205,6 +206,9 @@ struct FilePreviewView: View {
                 } else if isWeb {
                     WebPreview(url: url)
                         .id(url)
+                } else if !file.isText {
+                    QuickLookPreview(url: url)
+                        .id(url)
                 } else {
                     TextEditor(text: $text)
                         .font(.system(size: 13.5, design: .monospaced))
@@ -266,6 +270,40 @@ struct FilePreviewView: View {
         dirty = false
         note = "已保存"
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { note = "" }
+    }
+}
+
+struct QuickLookPreview: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let c = QLPreviewController()
+        c.dataSource = context.coordinator
+        return c
+    }
+
+    func updateUIViewController(_ c: QLPreviewController, context: Context) {
+        context.coordinator.url = url
+        c.reloadDataSource()
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(url: url) }
+
+    final class Coordinator: NSObject, QLPreviewControllerDataSource {
+        final class FileItem: NSObject, QLPreviewItem {
+            let u: URL
+            init(_ u: URL) { self.u = u }
+            var previewItemURL: URL? { u }
+            var previewItemTitle: String? { u.lastPathComponent }
+        }
+
+        var url: URL
+        init(url: URL) { self.url = url }
+
+        func numberOfPreviewItems(in _: QLPreviewController) -> Int { 1 }
+        func previewController(_: QLPreviewController, previewItemAt _: Int) -> QLPreviewItem {
+            FileItem(url)
+        }
     }
 }
 

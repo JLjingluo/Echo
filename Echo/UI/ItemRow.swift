@@ -84,7 +84,8 @@ struct TextBody: View {
 
     var body: some View {
         if item.isReasoning {
-            ReasonRow(text: item.text, live: item.status == .running)
+            ReasonRow(text: item.text, live: item.status == .running,
+                      seconds: max(0, item.endedAt.timeIntervalSince(item.startedAt)))
         } else if item.isStepHeader {
             MarkerRow(title: String(item.text.dropFirst(2)), symbol: "arrow.right.circle",
                       live: item.status == .running)
@@ -231,7 +232,15 @@ struct CodePanel: View {
 struct ReasonRow: View {
     let text: String
     var live: Bool
+    var seconds: Double = 0
     @State private var open = false
+
+    private var summary: String {
+        if live { return "思考中…" }
+        if seconds < 1 { return "想了一下。" }
+        if seconds < 60 { return "思考了 \(String(format: seconds < 10 ? "%.1f" : "%.0f", seconds)) 秒。" }
+        return "思考了 \(Int(seconds / 60)) 分 \(Int(seconds.truncatingRemainder(dividingBy: 60))) 秒。"
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -241,7 +250,7 @@ struct ReasonRow: View {
                     MarkdownView(text: text)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(live ? "思考中…" : "思考了几秒钟。")
+                    Text(summary)
                         .font(.system(size: Ench.body))
                         .foregroundStyle(Ench.secondaryText)
                 }
