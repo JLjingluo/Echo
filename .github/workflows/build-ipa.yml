@@ -1,0 +1,121 @@
+name: Build unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick newest Xcode
+        run: |
+          set -e
+          CAND=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "using $CAND"
+          sudo xcode-select -s "$CAND/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -E 'iphoneos' || true
+          sw_vers
+
+      - name: Install XcodeGen
+        run: |
+          set -e
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen --version
+
+      - name: Generate project
+        run: xcodegen generate --spec project.yml
+
+      - name: Build for iOS device (unsigned)
+        continue-on-error: true
+        run: |
+          xcodebuild \
+            -project Echo.xcodeproj \
+            -scheme Echo \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DD \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY= \
+            CODE_SIGNING_REQUIRED=NO \
+            PROVISIONING_PROFILE_SPECIFIER= \
+            build > build/build.log 2>&1; echo "BUILD_EXIT=$?" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Report errors as annotations
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import re, os
+          try:
+              log = open('build/build.log', errors='ignore').read()
+          except FileNotFoundError:
+              log = ''
+          pats = [
+              re.compile(r'^(.*?\.swift):(\d+):(\d+): error: (.*?)$', re.M),
+          ]
+          seen, emitted = set(), 0
+          for p in pats:
+              for m in p.finditer(log):
+                  f, ln, col, msg = m.group(1), m.group(2), m.group(3), m.group(4)
+                  f = os.path.basename(f)
+                  key = (f, ln, msg[:80])
+                  if key in seen:
+                      continue
+                  seen.add(key)
+                  msg = msg.replace('%', '%25').replace('\r', ' ')
+                  print(f'::error file={f},line={ln},col={col},title=Swift compile::{msg[:400]}')
+                  emitted += 1
+                  if emitted >= 60:
+                      break
+          if not emitted:
+              tail = log.strip().splitlines()[-40:]
+              print('no compile errors parsed; last log lines:')
+              print('\n'.join(tail))
+              for i, l in enumerate(tail):
+                  if 'error' in l.lower():
+                      print(f"::error title=build failure::{l[:400]}")
+          w = len(re.findall(r'warning:', log))
+          print(f'::notice title=summary::{emitted} unique errors, {w} warnings, exit={os.environ.get("BUILD_EXIT","?")}')
+          PY
+        shell: bash
+
+      - name: Fail if build failed
+        run: |
+          if [ "${BUILD_EXIT:-1}" != "0" ]; then
+            echo "build failed with exit ${BUILD_EXIT}"; exit 1
+          fi
+
+      - name: Ad-hoc sign
+        run: |
+          set -e
+          APP=$(find build/DD/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP"
+          echo "APP=$APP" >> "$GITHUB_ENV"
+          find "$APP" -type f \( -name '*.dylib' -o -perm +111 \) | while read -r f; do
+            codesign --force --sign - --timestamp=none "$f" || true
+          done
+          codesign --force --sign - --timestamp=none "$APP"
+          codesign -dv --verbose=2 "$APP" || true
+
+      - name: Package IPA
+        run: |
+          set -e
+          rm -rf out Payload && mkdir -p out Payload
+          cp -R "$APP" Payload/Echo.app
+          test -s Payload/Echo.app/Info.plist
+          /usr/bin/zip -qry out/Echo-unsigned.ipa Payload
+          ls -lh out
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Echo-unsigned-ipa
+          path: out/Echo-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
