@@ -162,7 +162,7 @@ struct ModelPickerSheet: View {
 
     @ViewBuilder private var manualSection: some View {
         @Bindable var app = app
-        Section("手动填模型名") {
+        Section {
             HStack {
                 TextField("例如 gpt-4o-mini", text: $manual)
                     .font(.system(.subheadline, design: .monospaced))
@@ -178,6 +178,8 @@ struct ModelPickerSheet: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             }
+        } header: {
+            Text("手动填模型名")
         } footer: {
             Text("接口地址只支持 https。填 http 会被系统直接拦掉，报出来就是「连不上厂商」。")
         }
