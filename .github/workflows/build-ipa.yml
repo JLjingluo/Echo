@@ -120,8 +120,11 @@ jobs:
       - name: Package IPA
         run: |
           set -e
-          VER=$(defaults read "$APP/Info.plist" CFBundleShortVersionString)
-          BUILD=$(defaults read "$APP/Info.plist" CFBundleVersion)
+          APP=$(cd "$(dirname "$APP")" && pwd)/$(basename "$APP")
+          PL="$APP/Info.plist"
+          VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PL")
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PL")
+          echo "version=$VER build=$BUILD"
           rm -rf out Payload && mkdir -p out Payload
           cp -R "$APP" Payload/Echo.app
           test -s Payload/Echo.app/Info.plist
