@@ -1,11 +1,11 @@
 import SwiftUI
 
-private struct Suggestion: Hashable {
+struct Suggestion: Hashable {
     let icon: String
     let text: String
 }
 
-private let echoSuggestions: [Suggestion] = [
+let echoSuggestions: [Suggestion] = [
     Suggestion(icon: "doc.viewfinder", text: "拍张发票，识别成能直接交的报销表"),
     Suggestion(icon: "mic", text: "这段会议录音，转成谁该干什么的清单"),
     Suggestion(icon: "curlybraces.squiggle", text: "写个 js 跑一下，算我这半年的日均花销"),
