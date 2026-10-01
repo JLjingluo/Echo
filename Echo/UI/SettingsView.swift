@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var showKey = false
     @State private var promptEditing = false
     @State private var showModel = false
+    @State private var confirmSessions = false
+    @State private var confirmFiles = false
     @State private var note = ""
 
     var body: some View {
@@ -153,25 +155,25 @@ struct SettingsView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
-                    SecureField("搜索接口 Key", text: $app.settings.searchKey)
+                    SecureField("搜索接口 Key", text: Binding(
+                        get: { EchoSecrets.searchKey },
+                        set: { EchoSecrets.searchKey = $0 }))
                         .font(.system(size: 13, design: .monospaced))
-                    Text("留空则用内置的公共搜索引擎，可能被限流。")
+                    Text("留空则用内置的公共搜索引擎，可能被限流。Key 存在钥匙串，不进设置文件。")
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                 }
 
                 Section("数据") {
+                    if EchoState.storeDegraded {
+                        Label("数据库打不开，本次会话只存在内存里，关掉就没了。重装 App 可以恢复。",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(.red)
+                    }
                     LabeledContent("工作区占用",
                                    value: ToolOutcome.sizeText(app.store.totalBytes()))
-                    Button("清空所有会话", role: .destructive) {
-                        try? ctx.delete(model: ChatSession.self)
-                        try? ctx.save()
-                        app.runtime.reset(for: UUID())
-                        note = "会话已清空"
-                    }
-                    Button("清空工作区文件", role: .destructive) {
-                        for u in app.store.allURLs() { try? FileManager.default.removeItem(at: u) }
-                        note = "工作区已清空"
-                    }
+                    Button("清空所有会话", role: .destructive) { confirmSessions = true }
+                    Button("清空工作区文件", role: .destructive) { confirmFiles = true }
                     LabeledContent("版本", value: "0.10")
                 }
             }
@@ -181,6 +183,28 @@ struct SettingsView: View {
                 ToolbarItem(placement: .topBarTrailing) { Button("完成") { app.save(); dismiss() } }
             }
             .onChange(of: app.settings) { _, _ in app.save() }
+            .confirmationDialog("清空所有会话？", isPresented: $confirmSessions,
+                                titleVisibility: .visible) {
+                Button("清空", role: .destructive) {
+                    try? ctx.delete(model: ChatSession.self)
+                    try? ctx.save()
+                    app.runtime.reset(for: UUID())
+                    note = "会话已清空"
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("所有聊天记录会立刻删除，撤销不了。")
+            }
+            .confirmationDialog("清空工作区文件？", isPresented: $confirmFiles,
+                                titleVisibility: .visible) {
+                Button("清空", role: .destructive) {
+                    for u in app.store.allURLs() { try? FileManager.default.removeItem(at: u) }
+                    note = "工作区已清空"
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("Agent 生成的文件会从本机删除。已经导出到「文件」App 的不受影响。")
+            }
             .safeAreaInset(edge: .bottom) {
                 if !note.isEmpty {
                     Text(note).font(.system(size: 13))

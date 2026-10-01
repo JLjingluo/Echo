@@ -37,6 +37,24 @@ struct InputBar: View {
 
     var body: some View {
         VStack(spacing: 8) {
+            if app.voice.needsSettings {
+                Button(action: { app.voice.openSettings() }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 13))
+                        Text("\(app.voice.hint.isEmpty ? "权限没开" : app.voice.hint) · 去开启")
+                            .font(.system(size: 13))
+                        Spacer()
+                    }
+                    .foregroundStyle(DiffTheme.delText)
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(DiffTheme.delFill))
+                    .overlay(RoundedRectangle(cornerRadius: 6)
+                        .stroke(DiffTheme.delText.opacity(0.35), lineWidth: 1))
+                }
+                .buttonStyle(GrowingButton())
+            }
+
             if app.runtime.needsApproval { approvalCard }
 
             HStack(spacing: 10) {

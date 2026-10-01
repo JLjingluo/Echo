@@ -260,7 +260,7 @@ enum ToolKit {
                     return .text(try await WebOps.search(a.s("query"), count: a.i("count", 8)))
                 }
                 return .text(try await WebOps.customSearch(endpoint: settings.searchEndpoint,
-                                                            key: settings.searchKey,
+                                                            key: EchoSecrets.searchKey,
                                                             query: a.s("query")))
             case .table_to_csv:
                 var text = a.s("text")

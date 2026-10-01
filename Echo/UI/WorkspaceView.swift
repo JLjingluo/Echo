@@ -10,6 +10,7 @@ struct WorkspaceView: View {
     @State private var renameTarget: WorkspaceFile?
     @State private var renameText = ""
     @State private var confirmDelete: WorkspaceFile?
+    @State private var confirmWipe = false
 
     var filtered: [WorkspaceFile] {
         query.trimmed.isEmpty ? files
@@ -45,7 +46,7 @@ struct WorkspaceView: View {
                         Button("导出全部到「文件」App", systemImage: "folder") { exportAll() }
                         Button("分享全部", systemImage: "square.and.arrow.up") { shareAll() }
                         Divider()
-                        Button("清空工作区", systemImage: "trash", role: .destructive) { wipe() }
+                        Button("清空工作区", systemImage: "trash", role: .destructive) { confirmWipe = true }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -79,6 +80,13 @@ struct WorkspaceView: View {
                                 titleVisibility: .visible) {
                 Button("删除", role: .destructive) { doDelete() }
                 Button("取消", role: .cancel) { confirmDelete = nil }
+            }
+            .confirmationDialog("清空整个工作区？", isPresented: $confirmWipe,
+                                titleVisibility: .visible) {
+                Button("全部删除", role: .destructive) { wipe() }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("\(files.count) 个文件会被删掉，撤销不了。已导出到「文件」App 的不受影响。")
             }
             .onAppear(perform: reload)
             .refreshable { reload() }

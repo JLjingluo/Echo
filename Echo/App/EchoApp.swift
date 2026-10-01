@@ -14,18 +14,19 @@ struct EchoApp: App {
 
     static func makeContainer() -> ModelContainer {
         let config = ModelConfiguration("EchoStore", isStoredInMemoryOnly: false)
-        do {
-            return try ModelContainer(for: ChatSession.self, ChatMessage.self, MsgBlock.self,
-                                      configurations: config)
-        } catch {
-            wipeStore()
-            do {
-                return try ModelContainer(for: ChatSession.self, ChatMessage.self, MsgBlock.self,
-                                          configurations: config)
-            } catch {
-                fatalError("数据库初始化失败：\(error.localizedDescription)")
-            }
+        if let c = try? ModelContainer(for: ChatSession.self, ChatMessage.self, MsgBlock.self,
+                                       configurations: config) {
+            return c
         }
+        wipeStore()
+        if let c = try? ModelContainer(for: ChatSession.self, ChatMessage.self, MsgBlock.self,
+                                       configurations: config) {
+            return c
+        }
+        EchoState.storeDegraded = true
+        let mem = ModelConfiguration("EchoStore", isStoredInMemoryOnly: true)
+        return try! ModelContainer(for: ChatSession.self, ChatMessage.self, MsgBlock.self,
+                                   configurations: mem)
     }
 
     private static func wipeStore() {
@@ -75,7 +76,7 @@ struct OnboardView: View {
                         Text("Echo")
                             .font(EchoFont.wordmark(30))
                             .foregroundStyle(EchoTheme.primaryText(scheme))
-                        Text("跑在你自己手机上：不上传文件、不经过我们的服务器，你的 Key 直连模型厂商。")
+                        Text("不经过我们的服务器：会话、文件、Key 都只在你手机上；调用模型时直连你选的那家厂商。图片会以 base64 发给该厂商做识别，联网抓取会走公开搜索引擎。")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

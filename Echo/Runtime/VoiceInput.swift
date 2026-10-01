@@ -8,6 +8,13 @@ final class VoiceInput {
     var listening = false
     var transcript = ""
     var hint = ""
+    var needsSettings = false
+
+    func openSettings() {
+        needsSettings = false
+        hint = ""
+        AppLinks.openAppSettings()
+    }
 
     private var engine: AVAudioEngine?
     private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -21,13 +28,17 @@ final class VoiceInput {
         SFSpeechRecognizer.requestAuthorization { status in
             Task { @MainActor in
                 guard status == .authorized else {
-                    self.hint = "没给语音识别权限，去设置里开"
+                    self.hint = "没给语音识别权限"
+                    self.needsSettings = true
+                    self.listening = false
                     return
                 }
                 AVAudioApplication.requestRecordPermission { ok in
                     Task { @MainActor in
                         guard ok else {
                             self.hint = "没给麦克风权限"
+                            self.needsSettings = true
+                            self.listening = false
                             return
                         }
                         self.begin(language)

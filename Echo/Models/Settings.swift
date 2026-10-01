@@ -64,7 +64,6 @@ struct AppSettings: Codable, Equatable {
     var autoExport: Bool = false
     var haptics: Bool = true
     var searchEndpoint: String = ""
-    var searchKey: String = ""
     var voiceLanguage: String = "zh-CN"
 
     static let defaultSystemPrompt = """
@@ -105,7 +104,6 @@ struct AppSettings: Codable, Equatable {
         autoExport = d(.autoExport, false)
         haptics = d(.haptics, true)
         searchEndpoint = d(.searchEndpoint, "")
-        searchKey = d(.searchKey, "")
         voiceLanguage = d(.voiceLanguage, "zh-CN")
     }
 

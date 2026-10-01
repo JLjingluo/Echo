@@ -68,6 +68,18 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if EchoState.storeDegraded {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 13))
+                    Text("数据库打不开，这次的内容关掉就没了。重装 App 可恢复。")
+                        .font(.system(size: 13))
+                    Spacer()
+                }
+                .foregroundStyle(DiffTheme.delText)
+                .padding(12)
+                .background(DiffTheme.delFill)
+            }
             header.padding(.horizontal)
             if timeline.isEmpty {
                 EmptyState(sendPrompt: { send(goal: $0, images: [], truncating: nil) })
