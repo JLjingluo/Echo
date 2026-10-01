@@ -208,6 +208,10 @@ struct SidebarView: View {
                     .font(.system(size: 22, weight: .thin))
                     .foregroundStyle(Ench.brandGradient)
                 Spacer()
+                Text(AppVersion.text)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Ench.tertiaryText)
+                    .padding(.trailing, 4)
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 17))

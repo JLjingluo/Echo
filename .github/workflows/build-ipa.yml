@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: write
+    env:
+      VERSION: 0.10
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +50,8 @@ jobs:
             CODE_SIGN_IDENTITY= \
             CODE_SIGNING_REQUIRED=NO \
             PROVISIONING_PROFILE_SPECIFIER= \
+            MARKETING_VERSION="${VERSION}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
             build > build/build.log 2>&1
           echo "BUILD_EXIT=$?" >> "$GITHUB_ENV"
           tail -40 build/build.log
@@ -116,17 +120,26 @@ jobs:
       - name: Package IPA
         run: |
           set -e
+          VER=$(defaults read "$APP/Info.plist" CFBundleShortVersionString)
+          BUILD=$(defaults read "$APP/Info.plist" CFBundleVersion)
           rm -rf out Payload && mkdir -p out Payload
           cp -R "$APP" Payload/Echo.app
           test -s Payload/Echo.app/Info.plist
-          /usr/bin/zip -qry out/Echo-unsigned.ipa Payload
+          NAME="Echo-${VER}-b${BUILD}-unsigned.ipa"
+          /usr/bin/zip -qry "out/$NAME" Payload
           ls -lh out
+          {
+            echo "IPA_NAME=$NAME"
+            echo "IPA_VER=$VER"
+            echo "IPA_BUILD=$BUILD"
+          } >> "$GITHUB_ENV"
+        shell: bash
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Echo-unsigned-ipa
-          path: out/Echo-unsigned.ipa
+          name: Echo-${{ env.IPA_VER }}-b${{ env.IPA_BUILD }}-unsigned
+          path: out/${{ env.IPA_NAME }}
           if-no-files-found: error
           retention-days: 30
 
@@ -134,10 +147,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set +e
-          gh release create v0.10-unsigned --title "Echo 0.10 unsigned" --prerelease \
-            --notes "未签名 IPA：下载后需用自己的 Apple ID 重签（Sideloadly / AltStore / Signulous）"
-          gh release upload v0.10-unsigned out/Echo-unsigned.ipa --clobber
-          gh release edit v0.10-unsigned --latest
           set -e
-          echo "direct link: https://github.com/${GITHUB_REPOSITORY}/releases/download/v0.10-unsigned/Echo-unsigned.ipa"
+          TAG="v${IPA_VER}-unsigned"
+          gh release create "$TAG" --title "Echo ${IPA_VER} unsigned" --prerelease \
+            --notes "测试版：下载后需用自己的 Apple ID 重签（Sideloadly / AltStore / Signulous）。包名带版本号和构建号。" || true
+          gh release upload "$TAG" "out/${IPA_NAME}" --clobber
+          gh release edit "$TAG" --title "Echo ${IPA_VER} · build ${IPA_BUILD}" --prerelease
+          LINK="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${IPA_NAME}"
+          gh release view "$TAG" --json assets \
+            | python3 -c 'import json,sys
+          a = json.load(sys.stdin)["assets"]
+          for x in a[:-5]:
+              print(x["databaseId"])' \
+            | while read -r id; do
+                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/$id" >/dev/null 2>&1 || true
+              done
+          echo "本次包：${IPA_NAME}"
+          echo "$LINK"
+          echo "### 本次包 \`${IPA_NAME}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "[直接下载]($LINK)" >> "$GITHUB_STEP_SUMMARY"
+        shell: bash

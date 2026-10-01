@@ -174,7 +174,7 @@ struct SettingsView: View {
                                    value: ToolOutcome.sizeText(app.store.totalBytes()))
                     Button("清空所有会话", role: .destructive) { confirmSessions = true }
                     Button("清空工作区文件", role: .destructive) { confirmFiles = true }
-                    LabeledContent("版本", value: "0.10")
+                    LabeledContent("版本", value: AppVersion.text)
                 }
             }
             .navigationTitle("设置")

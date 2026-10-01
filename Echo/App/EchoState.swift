@@ -13,6 +13,16 @@ enum EchoSecrets {
     }
 }
 
+enum AppVersion {
+    static var short: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.10"
+    }
+    static var build: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+    }
+    static var text: String { "\(short) · b\(build)" }
+}
+
 enum AppLinks {
     static func openAppSettings() {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }

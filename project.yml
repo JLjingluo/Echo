@@ -30,7 +30,7 @@ targets:
     info:
       path: Echo/Info.plist
       properties:
-        CFBundleDisplayName: Echo
+        CFBundleDisplayName: Echo $(MARKETING_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
