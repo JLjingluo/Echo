@@ -83,7 +83,6 @@ struct ChatView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle(session.title.isEmpty ? "新会话" : session.title)
-            .navigationSubtitle(" ")
             .toolbarBackground(EchoTheme.background(scheme), for: .navigationBar)
             .tint(EchoTheme.controlFill(scheme))
             .toolbar { bar }
