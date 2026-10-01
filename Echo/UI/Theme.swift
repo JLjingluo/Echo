@@ -189,19 +189,14 @@ extension View {
 }
 
 struct EchoSurface<Content: View>: View {
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let content: () -> Content
 
     init(@ViewBuilder content: @escaping () -> Content) { self.content = content }
 
     var body: some View {
         content()
-            .background {
-                RoundedRectangle(cornerRadius: EchoM.surfaceRadius, style: .continuous)
-                    .fill(EchoTheme.surface(scheme))
-                    .opacity(reduceTransparency ? 1 : 0.92)
-            }
+            .background(Ink.paper)
+            .sketchBox(seed: 23, double: true, gapSide: 1)
     }
 }
 
@@ -251,19 +246,20 @@ struct EchoGlassButton: View {
                     .buttonStyle(.plain)
                     .background {
                         if title == nil {
-                            Circle().fill(EchoTheme.controlFill(scheme))
+                            Circle().fill(Ink.line)
                         } else {
-                            Capsule().fill(EchoTheme.controlFill(scheme))
+                            Capsule().fill(Ink.line)
                         }
                     }
             } else {
                 Button(role: role, action: action) { label }
                     .buttonStyle(.plain)
-                    .glass(title == nil ? .circle : .capsule, interactive: true)
+                    .sketch(seed: 19, corner: title == nil ? 999 : 16,
+                            capsule: title == nil, double: true)
             }
         }
         .font(.body.weight(.semibold))
-        .foregroundStyle(style == .prominent ? EchoTheme.controlForeground(scheme) : Color.primary)
+        .foregroundStyle(style == .prominent ? Ink.paper : Color.primary)
         .opacity(disabled ? 0.5 : 1)
         .disabled(disabled)
         .frame(maxWidth: maxWidth)
@@ -284,7 +280,7 @@ struct EchoGlassButton: View {
         .overlay {
             if isLoading {
                 ProgressView().controlSize(.small)
-                    .tint(style == .prominent ? EchoTheme.controlForeground(scheme) : .secondary)
+                    .tint(style == .prominent ? Ink.paper : .secondary)
             }
         }
     }

@@ -152,13 +152,15 @@ struct ModelPickerSheet: View {
                         }
                         .disabled(manual.trimmed.isEmpty)
                     }
-                    LabeledContent("Base URL") {
+                    LabeledContent("接口地址（Base URL）") {
                         TextField("", text: $app.settings.baseURL, prompt: Text("https://..."))
                             .multilineTextAlignment(.trailing)
                             .font(.system(.caption, design: .monospaced))
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                     }
+                } footer: {
+                    Text("接口地址只支持 https。填 http 会被系统直接拦掉，报出来就是「连不上厂商」。")
                 }
             }
             .searchable(text: $query, prompt: "搜模型")

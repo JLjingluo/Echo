@@ -10,6 +10,19 @@ struct EchoApp: App {
     init() {
         EchoFont.register()
         container = Self.makeContainer()
+        Self.excludeStoreFromBackup()
+    }
+
+    private static func excludeStoreFromBackup() {
+        guard let dir = FileManager.default.urls(for: .applicationSupportDirectory,
+                                                 in: .userDomainMask).first else { return }
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        where name.hasPrefix("EchoStore") {
+            var url = dir.appendingPathComponent(name)
+            try? url.setResourceValues(values)
+        }
     }
 
     static func makeContainer() -> ModelContainer {

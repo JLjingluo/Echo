@@ -41,6 +41,10 @@ final class FileStore {
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
         root = base.appendingPathComponent("Workspace", isDirectory: true)
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var writable = root
+        try? writable.setResourceValues(values)
     }
 
     func url(for name: String) throws -> URL {

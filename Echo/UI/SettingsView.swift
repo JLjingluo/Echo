@@ -133,7 +133,7 @@ struct SettingsView: View {
                     .font(.system(size: 13))
                 Slider(value: $app.settings.temperature, in: 0...2, step: 0.05)
             }
-            Stepper("最长回复 \(app.settings.maxTokens) tokens",
+            Stepper("最多生成长度 \(app.settings.maxTokens) tokens",
                     value: $app.settings.maxTokens, in: 512...32000, step: 512)
         }
     }
