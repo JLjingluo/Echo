@@ -7,7 +7,7 @@ enum ToolOutcome {
     var displayText: String {
         switch self {
         case .text(let s): return s
-        case .file(let n, let u, let b, let a, let r):
+        case .file(let n, let u, let b, _, let a, let r):
             return "已写入 \(n)（\(sizeText(b))，+\(a) −\(r) 行），路径 \(u.path)"
         }
     }
@@ -15,7 +15,7 @@ enum ToolOutcome {
     var modelText: String {
         switch self {
         case .text(let s): return s
-        case .file(let n, _, _, let a, let r): return "文件已写入 \(n)（+\(a) −\(r) 行），已保存到手机本地工作区。"
+        case .file(let n, _, _, _, let a, let r): return "文件已写入 \(n)（+\(a) −\(r) 行），已保存到手机本地工作区。"
         }
     }
 

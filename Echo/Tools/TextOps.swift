@@ -302,9 +302,9 @@ enum DateCalc {
         let sign: Double = lower.hasSuffix(" ago") ? -1 : 1
         let body = lower.replacingOccurrences(of: " ago", with: "")
         if let n = Double(body.filter { "0123456789.".contains($0) }) {
-            if body.contains("hour") || body.contains("h") { return cal.date(byAdding: .hour, value: Int(n * sign), from: .now) }
-            if body.contains("day") || body.contains("d") { return cal.date(byAdding: .day, value: Int(n * sign), from: .now) }
-            if body.contains("min") || body.contains("m") { return cal.date(byAdding: .minute, value: Int(n * sign), from: .now) }
+            if body.contains("hour") || body.contains("h") { return cal.date(byAdding: .hour, value: Int(n * sign), to: .now) }
+            if body.contains("day") || body.contains("d") { return cal.date(byAdding: .day, value: Int(n * sign), to: .now) }
+            if body.contains("min") || body.contains("m") { return cal.date(byAdding: .minute, value: Int(n * sign), to: .now) }
         }
         c.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current
         let f = DateFormatter()
@@ -325,7 +325,7 @@ enum DateCalc {
         case "second", "秒", "s": u = .second
         default: return nil
         }
-        return cal.date(byAdding: u, value: n, from: d)
+        return cal.date(byAdding: u, value: n, to: d)
     }
 
     private static func weekdayCN(_ d: Date, _ cal: Calendar) -> String {

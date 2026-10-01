@@ -24,7 +24,7 @@ final class Notifier: NSObject {
     func runDone(title: String, body: String) {
         requestAuth()
         let inBackground = UIApplication.shared.applicationState != .active
-        if Notifier.settingsHaptics { UIImpactFeedbackGenerator(style: .success).impactOccurred() }
+        if Notifier.settingsHaptics { UIImpactFeedbackGenerator(style: .rigid).impactOccurred() }
         guard inBackground else { return }
         let content = UNMutableNotificationContent()
         content.title = title

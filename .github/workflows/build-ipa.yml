@@ -54,6 +54,9 @@ jobs:
       - name: Report errors as annotations
         if: always()
         run: |
+          echo "===== RAW ERRORS ====="
+          grep -E "error: " build/build.log 2>/dev/null | sed 's|/Users/runner/work/Echo/Echo/||' | sort -u | head -120
+          echo "===== END ====="
           python3 - <<'PY'
           import re, os
           try:

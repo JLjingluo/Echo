@@ -50,7 +50,7 @@ enum EchoWheel {
     private static let titleKey = "echo.wheel.title"
     private static let titles = ["从一个项目开始。", "从一个任务开始。", "今天想做点什么？"]
 
-    static func round() -> (title: String, picks: [Suggestion]) {
+    fileprivate static func round() -> (title: String, picks: [Suggestion]) {
         let d = UserDefaults.standard
         var bag = (d.array(forKey: bagKey) as? [Int]) ?? []
         if bag.count < 3 {

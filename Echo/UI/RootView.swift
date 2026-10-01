@@ -167,7 +167,7 @@ struct SidebarView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("删除", role: .destructive) {
+            Button("删除", systemImage: "trash", role: .destructive) {
                 context.delete(s)
                 try? context.save()
                 if current?.id == s.id { current = nil }

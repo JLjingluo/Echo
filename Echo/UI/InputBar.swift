@@ -4,10 +4,10 @@ import PhotosUI
 struct InputBar: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
+    @Binding var text: String
     let session: ChatSession
     var onOpenSettings: () -> Void
 
-    @Binding var text: String
     @State private var images: [Data] = []
     @State private var picking = false
     @State private var items: [PhotosPickerItem] = []

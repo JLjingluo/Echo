@@ -9,11 +9,11 @@ enum KeychainStore {
         let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
                                    kSecAttrService as String: service,
                                    kSecAttrAccount as String: account]
-        SecItemDelete(base)
+        SecItemDelete(base as CFDictionary)
         var add = base
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(add as [String: Any], nil)
+        SecItemAdd(add as CFDictionary, nil)
     }
 
     static func get(_ account: String) -> String {
@@ -31,9 +31,10 @@ enum KeychainStore {
     }
 
     static func clear(_ account: String) {
-        SecItemDelete([kSecClass as String: kSecClassGenericPassword,
-                       kSecAttrService as String: service,
-                       kSecAttrAccount as String: account])
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: service,
+                                    kSecAttrAccount as String: account]
+        SecItemDelete(query as CFDictionary)
     }
 
     static func key(for provider: ProviderKind, vendor: String) -> String {

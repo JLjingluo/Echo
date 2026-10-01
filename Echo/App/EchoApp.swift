@@ -15,12 +15,12 @@ struct EchoApp: App {
         let config = ModelConfiguration("EchoStore", isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: ChatSession.self, ChatMessage.self, MsgBlock.self,
-                                      configurations: [config])
+                                      configurations: config)
         } catch {
             wipeStore()
             do {
                 return try ModelContainer(for: ChatSession.self, ChatMessage.self, MsgBlock.self,
-                                          configurations: [config])
+                                          configurations: config)
             } catch {
                 fatalError("数据库初始化失败：\(error.localizedDescription)")
             }

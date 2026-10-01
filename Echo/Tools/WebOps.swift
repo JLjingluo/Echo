@@ -116,7 +116,9 @@ enum WebOps {
 
     private static func decode(_ data: Data) -> String {
         if let s = String(data: data, encoding: .utf8) { return s }
-        let encodings = [String.Encoding.isoLatin1, .windowsCP1252, .shiftJIS, .gb18030]
+        let gb = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(
+            CFStringEncoding(CFStringEncodings.GB18030_2005.rawValue)))
+        let encodings = [String.Encoding.isoLatin1, .windowsCP1252, .shiftJIS, gb]
         for e in encodings {
             if let s = String(data: data, encoding: e) { return s }
         }
