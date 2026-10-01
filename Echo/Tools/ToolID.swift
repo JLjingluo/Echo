@@ -4,6 +4,7 @@ enum ToolID: String, CaseIterable, Sendable {
     case write_file, read_file, list_files, delete_file, move_file
     case text_ops, diff_text, run_js, web_fetch, web_search
     case table_to_csv, date_calc, unit_convert, make_qrcode, ocr_image
+    case ask_user
 
     var label: String {
         switch self {
@@ -22,6 +23,7 @@ enum ToolID: String, CaseIterable, Sendable {
         case .unit_convert: return "单位换算"
         case .make_qrcode: return "生成二维码"
         case .ocr_image: return "图片识字"
+        case .ask_user: return "问你"
         }
     }
 
@@ -42,6 +44,7 @@ enum ToolID: String, CaseIterable, Sendable {
         case .unit_convert: return "rulers"
         case .make_qrcode: return "qrcode"
         case .ocr_image: return "text.viewfinder"
+        case .ask_user: return "questionmark.bubble"
         }
     }
 }

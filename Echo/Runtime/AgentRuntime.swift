@@ -25,6 +25,37 @@ final class AgentRuntime {
     private var callBuf: [String: ToolCallView] = [:]
     private var callOrder: [String] = []
 
+    struct AskUser: Equatable {
+        let callId: String
+        let question: String
+        let options: [String]
+    }
+
+    private(set) var pendingQuestion: AskUser?
+    private var answerCont: CheckedContinuation<String, Never>?
+
+    func answer(_ text: String) {
+        let t = text.trimmed.isEmpty ? "（用户没填，按你的判断继续）" : text.trimmed
+        pendingQuestion = nil
+        answerCont?.resume(returning: t)
+        answerCont = nil
+    }
+
+    private func askUser(_ call: CollectedCall) async -> String {
+        let a = Args(json: call.args)
+        let opts = (JSONHelper.dict(call.args)["options"] as? [String])?
+            .filter { !$0.trimmed.isEmpty } ?? []
+        pendingQuestion = AskUser(callId: call.id, question: a.s("question"),
+                                  options: Array(opts.prefix(4)))
+        return await withCheckedContinuation { c in answerCont = c }
+    }
+
+    private func dropQuestion(_ why: String) {
+        pendingQuestion = nil
+        answerCont?.resume(returning: why)
+        answerCont = nil
+    }
+
     func reset(for id: UUID) {
         task?.cancel()
         task = nil
@@ -41,6 +72,7 @@ final class AgentRuntime {
         reasonId = nil
         callBuf = [:]
         callOrder = []
+        dropQuestion("（这次运行被重置）")
     }
 
     func addNote(_ text: String) {
@@ -49,6 +81,7 @@ final class AgentRuntime {
     }
 
     func cancel() {
+        dropQuestion("（用户停止了任务）")
         task?.cancel()
         task = nil
         for i in items.indices where items[i].status == .running || items[i].status == .pending {
@@ -256,6 +289,19 @@ final class AgentRuntime {
                                                startedAt: .now, endedAt: .now)
                     }
                     msgs.append(.tool(call.id, name: call.name, result: msg))
+                    continue
+                }
+                if tool == .ask_user {
+                    let asked = Date.now
+                    let ans = await askUser(call)
+                    update(call.id) {
+                        $0.status = .done
+                        $0.text = "用户回答：\(ans)"
+                        $0.call = ToolCallView(id: call.id, name: call.name, argsJSON: call.args,
+                                               result: ans, status: .done,
+                                               startedAt: asked, endedAt: .now)
+                    }
+                    msgs.append(.tool(call.id, name: call.name, result: "用户回答：\(ans)"))
                     continue
                 }
                 let started = Date.now

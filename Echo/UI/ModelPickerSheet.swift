@@ -126,7 +126,9 @@ struct ModelPickerSheet: View {
                         }
                     } else {
                         ForEach(visible) { m in
-                            SelectionRow(title: m.id, detail: m.owner,
+                            SelectionRow(title: m.id,
+                                         detail: NoToolMemory.contains(m.id)
+                                            ? "\(m.owner) · 曾被记为不能调工具，选它即清除" : m.owner,
                                          isSelected: app.settings.model == m.id) {
                                 pick(m.id)
                             }
@@ -211,6 +213,7 @@ struct ModelPickerSheet: View {
     }
 
     private func pick(_ model: String) {
+        NoToolMemory.forget(model)
         app.settings.model = model
         app.save()
         Notifier.shared.tap()

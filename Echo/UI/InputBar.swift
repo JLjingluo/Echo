@@ -31,6 +31,7 @@ struct InputBar: View {
     @State private var images: [Data] = []
     @State private var items: [PhotosPickerItem] = []
     @State private var isRecording = false
+    @State private var freeAnswer = ""
     @FocusState private var focused: Bool
 
     private var busy: Bool { app.runtime.isBusy }
@@ -54,6 +55,8 @@ struct InputBar: View {
                 }
                 .buttonStyle(GrowingButton())
             }
+
+            if let q = app.runtime.pendingQuestion { questionCard(q) }
 
             if app.runtime.needsApproval { approvalCard }
 
@@ -142,6 +145,60 @@ struct InputBar: View {
         .onChange(of: app.voice.transcript) { _, new in
             if app.voice.listening { text = new }
         }
+    }
+
+    private func questionCard(_ q: AgentRuntime.AskUser) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "questionmark.bubble.fill").font(.system(size: 14))
+                Text("Echo 要问你")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Ench.secondaryText)
+                Spacer()
+            }
+            Text(q.question.isEmpty ? "需要你补一个信息。" : q.question)
+                .font(.system(size: 16))
+                .fixedSize(horizontal: false, vertical: true)
+            if !q.options.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(q.options, id: \.self) { o in
+                        Button { app.runtime.answer(o) } label: {
+                            Text(o)
+                                .font(.system(size: 14, weight: .medium))
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 34)
+                                .background(Capsule().fill(Ench.text.opacity(0.10)))
+                                .overlay(Capsule().stroke(Ench.border, lineWidth: 1))
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(GrowingButton())
+                    }
+                }
+            }
+            HStack(spacing: 8) {
+                TextField("或者自己打字回答", text: $freeAnswer)
+                    .font(.system(size: 14))
+                    .onSubmit { submitAnswer() }
+                Button(action: submitAnswer) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Ench.background)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Ench.text))
+                }
+                .buttonStyle(GrowingButton())
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Ench.cardFill))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .stroke(Ench.cardStroke, lineWidth: 1))
+    }
+
+    private func submitAnswer() {
+        app.runtime.answer(freeAnswer)
+        freeAnswer = ""
     }
 
     private var approvalCard: some View {

@@ -105,7 +105,15 @@ struct SettingsView: View {
 
                 Section("生成") {
                     Toggle("流式输出", isOn: $app.settings.stream)
-                    Toggle("深度思考（更慢更准）", isOn: $app.settings.deepThink)
+                    Picker("深度思考") {
+                        Text("自动").tag("auto")
+                        Text("强制开").tag("on")
+                        Text("强制关").tag("off")
+                    }
+                    .pickerStyle(.menu)
+                    Text("\(app.settings.model)：\(app.settings.thinkingHint)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                     VStack(alignment: .leading) {
                         Text("温度 \(app.settings.temperature, specifier: "%.2f")")
                             .font(.system(size: 13))

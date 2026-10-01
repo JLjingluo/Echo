@@ -301,8 +301,9 @@ struct ToolRow: View {
     }
 
     private var title: String {
-        let label = ToolID(rawValue: name)?.label ?? ""
-        return label.isEmpty ? name : "\(name) · \(label)"
+        let raw = item.call?.argsJSON ?? item.argsDisplay
+        guard let id = ToolID(rawValue: name) else { return name }
+        return ToolSummary.title(id, args: raw)
     }
 
     private var symbol: String {
@@ -382,10 +383,22 @@ struct FileRow: View {
 struct PlanCard: View {
     let steps: [StepState]
 
+    private var doneCount: Int { steps.filter { $0.status == .done }.count }
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             AssistantAvatar().offset(CGSize(width: 0, height: 6))
             VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text("执行计划")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Ench.secondaryText)
+                    Spacer()
+                    Text("\(doneCount)/\(steps.count)")
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(Ench.tertiaryText)
+                        .monospacedDigit()
+                }
                 ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
                     HStack(alignment: .top, spacing: 10) {
                         Group {

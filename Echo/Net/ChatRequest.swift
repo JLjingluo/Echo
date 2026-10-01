@@ -56,6 +56,7 @@ struct ChatRequest: Sendable {
     var maxTokens: Int
     var stream: Bool
     var thinking: Bool
+    var thinkingMode: String = "auto"
     var provider: ProviderKind
     var baseURL: String
     var vendorID: String = ""
@@ -69,6 +70,7 @@ struct ChatRequest: Sendable {
         maxTokens = settings.maxTokens
         stream = settings.stream
         thinking = settings.deepThink
+        thinkingMode = settings.thinkingMode
         provider = settings.provider
         baseURL = settings.trimmedBaseURL
         vendorID = settings.vendorID
@@ -121,10 +123,18 @@ struct ChatRequest: Sendable {
             body["tool_choice"] = "auto"
             body["parallel_tool_calls"] = true
         }
-        if thinking && m.contains("deepseek") && !m.contains("reasoner") {
-            body["thinking"] = ["type": "enabled"]
+        if m.contains("deepseek") && !m.contains("reasoner") {
+            if thinking { body["thinking"] = ["type": "enabled"] }
+            else if thinkingMode == "off" { body["thinking"] = ["type": "disabled"] }
         }
-        if thinking && m.contains("qwen") { body["enable_thinking"] = true }
+        if m.contains("qwen") {
+            if thinking { body["enable_thinking"] = true }
+            else if thinkingMode == "off" { body["enable_thinking"] = false }
+        }
+        if m.contains("kimi") || m.contains("moonshot") {
+            if thinking { body["thinking"] = ["type": "enabled"] }
+            else if thinkingMode == "off" { body["thinking"] = ["type": "disabled"] }
+        }
         if stream {
             body["stream_options"] = ["include_usage": true]
         }

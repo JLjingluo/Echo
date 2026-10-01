@@ -57,7 +57,7 @@ struct AppSettings: Codable, Equatable {
     var systemPrompt: String = AppSettings.defaultSystemPrompt
     var stream: Bool = true
     var autoApprove: Bool = false
-    var deepThink: Bool = false
+    var thinkingModes: [String: String] = [:]
     var historyLimit: Int = 40
     var enabledTools: [String] = ToolID.allCases.map(\.rawValue)
         .filter { $0 != ToolID.delete_file.rawValue }
@@ -98,7 +98,7 @@ struct AppSettings: Codable, Equatable {
         systemPrompt = d(.systemPrompt, Self.defaultSystemPrompt)
         stream = d(.stream, true)
         autoApprove = d(.autoApprove, false)
-        deepThink = d(.deepThink, false)
+        thinkingModes = d(.thinkingModes, [:])
         historyLimit = d(.historyLimit, 40)
         enabledTools = d(.enabledTools, ToolID.allCases.map(\.rawValue)
             .filter { $0 != ToolID.delete_file.rawValue })
@@ -110,6 +110,28 @@ struct AppSettings: Codable, Equatable {
     }
 
     var toolsEnabled: Set<String> { Set(enabledTools) }
+
+    var thinkingMode: String {
+        get { thinkingModes[model] ?? "auto" }
+        set {
+            if newValue == "auto" { thinkingModes.removeValue(forKey: model) }
+            else { thinkingModes[model] = newValue }
+        }
+    }
+
+    var deepThink: Bool { thinkingMode == "on" }
+
+    var thinkingHint: String {
+        let m = model.lowercased()
+        let native = m.contains("reasoner") || m.contains("thinking") || m.contains("r1")
+            || m.contains("qwq") || m.hasPrefix("o1") || m.hasPrefix("o3") || m.hasPrefix("o4")
+        switch thinkingMode {
+        case "on": return "已强制开启：更慢、更费 token。"
+        case "off": return native ? "这个模型本来就思考，关掉可能不生效。" : "已强制关闭。"
+        default: return native ? "这个模型默认就会思考，交给它自己。"
+            : "自动：不额外发思考参数。"
+        }
+    }
 
     func toolAllowed(_ id: ToolID) -> Bool { enabledTools.contains(id.rawValue) }
 

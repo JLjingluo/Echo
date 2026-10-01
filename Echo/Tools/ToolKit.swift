@@ -183,6 +183,14 @@ enum ToolKit {
             return ToolSchema(name: id.rawValue,
                 description: "识别工作区里图片中的文字（OCR）。",
                 parameters: obj(["name": str("图片文件名")], ["name"]))
+        case .ask_user:
+            return ToolSchema(name: id.rawValue,
+                description: "当面问用户一个问题。只在缺的信息会导致结果完全不对时用（比如「发给谁」「哪个城市」「要不要带预算上限」），一次最多问一个。给 2 到 4 个候选项，用户点一下就答；用户也可以自己打字。能合理推断的别问。",
+                parameters: obj([
+                    "question": str("要问的一句话，不超过 40 字"),
+                    "options": ["type": "array", "items": ["type": "string"],
+                                "description": "2 到 4 个候选短答"],
+                ], ["question"]))
         }
     }
 
@@ -204,7 +212,7 @@ enum ToolKit {
             case .write_file:
                 let name = a.s("name")
                 let content = a.s("content")
-                guard !name.isEmpty else { return .text("❌ 没给文件名") }
+                guard !name.isEmpty else { return .text("失败：没给文件名") }
                 let old = FileStore.shared.exists(name)
                     ? ((try? FileStore.shared.read(name, maxBytes: 400_000)) ?? "") : ""
                 let url = try FileStore.shared.write(name, content)
@@ -229,7 +237,7 @@ enum ToolKit {
                 let f = DateFormatter()
                 f.dateFormat = "MM-dd HH:mm"
                 return .text(items.map {
-                    "\($0.isDir ? "📁" : "📄") \($0.name)  \($0.sizeText)  \(f.string(from: $0.modified))"
+                    "\($0.isDir ? "[目录]" : "[文件]") \($0.name)  \($0.sizeText)  \(f.string(from: $0.modified))"
                 }.joined(separator: "\n"))
             case .delete_file:
                 _ = try FileStore.shared.delete(a.s("name"))
@@ -279,13 +287,15 @@ enum ToolKit {
                              preview: "二维码内容：\(a.s("text").clamped(120))", added: 1, removed: 0)
             case .ocr_image:
                 return .text(try await ImageOps.ocr(path: a.s("name")))
+            case .ask_user:
+                return .text("（由运行时接管，不应到这里）")
             }
         } catch let e as ToolFailure {
-            return .text("❌ \(e.message)")
+            return .text("失败：\(e.message)")
         } catch let e as FileStoreError {
-            return .text("❌ \(e.localizedDescription)")
+            return .text("失败：\(e.localizedDescription)")
         } catch {
-            return .text("❌ 工具执行失败：\(error.localizedDescription)")
+            return .text("失败：工具执行出错 — \(error.localizedDescription)")
         }
     }
 }

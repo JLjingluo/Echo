@@ -17,6 +17,7 @@ struct ChatView: View {
     @State private var previewFile: RunFile?
     @State private var exportURLs: [URL] = []
     @State private var expandedGroups: Set<String> = []
+    @State private var reach = Reachability.shared
 
     private var runtime: AgentRuntime { app.runtime }
 
@@ -79,6 +80,17 @@ struct ChatView: View {
                 .foregroundStyle(DiffTheme.delText)
                 .padding(12)
                 .background(DiffTheme.delFill)
+            }
+            if !reach.online {
+                HStack(spacing: 8) {
+                    Image(systemName: "wifi.slash").font(.system(size: 13))
+                    Text("没网。发出去的任务会等着，联网后重试。")
+                        .font(.system(size: 13))
+                    Spacer()
+                }
+                .foregroundStyle(Ench.secondaryText)
+                .padding(12)
+                .background(Ench.secondaryBackground)
             }
             header.padding(.horizontal)
             if timeline.isEmpty {

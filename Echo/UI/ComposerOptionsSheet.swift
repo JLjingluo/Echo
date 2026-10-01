@@ -28,7 +28,28 @@ struct ComposerOptionsSheet: View {
                             Divider().padding(.leading, 52)
                             row("粘贴板", icon: "doc.on.clipboard", value: nil, action: onPaste)
                             Divider().padding(.leading, 52)
-                            toggle("深度思考", icon: "brain.head.profile", isOn: $app.settings.deepThink)
+                            Menu {
+                                Button("自动") { setMode("auto") }
+                                Button("强制开") { setMode("on") }
+                                Button("强制关") { setMode("off") }
+                            } label: {
+                                HStack(spacing: 14) {
+                                    EchoIcon("brain.head.profile", size: 20).frame(width: 23)
+                                    Text("深度思考").font(.body)
+                                    Spacer(minLength: 8)
+                                    Text(modeLabel).font(.subheadline).foregroundStyle(.secondary)
+                                    EchoIcon("chevron.right", size: 13).foregroundStyle(.secondary)
+                                }
+                                .padding(16)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            Text(app.settings.thinkingHint)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
                             Divider().padding(.leading, 52)
                             toggle("计划自动执行", icon: "play.circle", isOn: $app.settings.autoApprove)
                             Divider().padding(.leading, 52)
@@ -161,6 +182,20 @@ struct ComposerOptionsSheet: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    private var modeLabel: String {
+        switch app.settings.thinkingMode {
+        case "on": return "强制开"
+        case "off": return "强制关"
+        default: return "自动"
+        }
+    }
+
+    private func setMode(_ v: String) {
+        app.settings.thinkingMode = v
+        app.save()
+        Notifier.shared.tap()
     }
 
     private func toolBinding(_ t: ToolID) -> Binding<Bool> {

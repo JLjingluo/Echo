@@ -11,10 +11,10 @@ enum ScriptRunner {
     }
 
     private static func execute(_ source: String, _ input: String) -> String {
-        guard let ctx = JSContext() else { return "❌ JavaScriptCore 起不来" }
+        guard let ctx = JSContext() else { return "失败：JavaScriptCore 起不来" }
         var errors: [String] = []
         ctx.exceptionHandler = { _, ex in
-            if let ex { errors.append("❌ JS 错误: \(ex)") }
+            if let ex { errors.append("JS 错误: \(ex)") }
         }
         let hook = """
         var __out = [];
