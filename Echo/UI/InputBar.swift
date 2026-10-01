@@ -17,6 +17,7 @@ struct InputBar: View {
     @State private var freeAnswer = ""
     @State private var chips: [Suggestion] = []
     @State private var showOptions = false
+    @State private var flick: CGFloat = 0
     @FocusState private var focused: Bool
 
     private var busy: Bool { app.runtime.isBusy }
@@ -91,14 +92,10 @@ struct InputBar: View {
         HStack(spacing: 8) {
             Button { showOptions = true } label: {
                 HandIcon(glyph: .plus, size: 20, color: Ink.line, seed: 411)
-                    .frame(width: 34, height: 34)
-                    .overlay {
-                        SketchCircle(seed: 412, open: false)
-                            .stroke(Ink.line, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                    }
+                    .frame(width: 38, height: 38)
                     .contentShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(RedrawButtonStyle(shape: SketchCircle(seed: 412)))
 
             ZStack(alignment: .leading) {
                 if text.isEmpty {
@@ -141,6 +138,15 @@ struct InputBar: View {
                 gap: hasInput ? nil : 7)
         .contentShape(Rectangle())
         .onTapGesture { focused = true }
+        .overlay(alignment: .trailing) {
+            if flick > 0.001 {
+                HandIcon(glyph: .send, size: 19, color: Ink.line, seed: 442)
+                    .opacity(Double(1 - flick))
+                    .offset(x: 22 * flick, y: -16 * flick)
+                    .rotationEffect(.degrees(-14 * flick))
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     private var thumbs: some View {
@@ -166,18 +172,15 @@ struct InputBar: View {
     private var sendButton: some View {
         Button(action: { busy ? stop() : send() }) {
             ZStack {
-                SketchCircle(seed: busy ? 441 : 440, open: !hasInput && !busy)
-                    .stroke(hasInput || busy ? Ink.line : Ink.faint,
-                            style: StrokeStyle(lineWidth: 1.7, lineCap: .round))
                 HandIcon(glyph: busy ? .stop : .send, size: 20,
                          color: hasInput || busy ? Ink.line : Ink.faint, seed: 442)
             }
             .frame(width: 38, height: 38)
             .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RedrawButtonStyle(shape: SketchCircle(seed: 440),
+                                       color: hasInput || busy ? Ink.line : Ink.faint))
         .disabled(busy ? false : !hasInput)
-        .animation(.easeOut(duration: 0.15), value: hasInput)
         .accessibilityLabel(busy ? "停止" : "发送")
     }
 
@@ -308,6 +311,11 @@ struct InputBar: View {
         focused = false
         editingText = nil
         chips = EchoWheel.picks(4)
+        if !UIAccessibility.isReduceMotionEnabled {
+            flick = 0.001
+            withAnimation(.easeOut(duration: 0.42)) { flick = 1 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { flick = 0 }
+        }
         if app.voice.listening { app.voice.stop(); isRecording = false }
     }
 

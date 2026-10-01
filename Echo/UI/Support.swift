@@ -220,7 +220,7 @@ struct CodeBlock: View {
         }
         .background(Ink.wash)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .sketch(seed: 17, corner: 10)
+        .sketchBox(seed: 17, gapSide: 2)
         .task(id: copied) {
             guard copied else { return }
             try? await Task.sleep(for: .seconds(2))

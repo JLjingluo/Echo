@@ -16,6 +16,7 @@ struct RootView: View {
             let w = max(geo.size.width * fraction, 1)
             ZStack(alignment: .leading) {
                 Ink.paper.ignoresSafeArea()
+                PaperGrain().ignoresSafeArea()
 
                 SidebarView(current: $current, progress: $progress, open: $open,
                             sessions: sessions, reveal: w)
@@ -53,6 +54,7 @@ struct RootView: View {
 
     @ViewBuilder
     private func detail(reveal: CGFloat) -> some View {
+        let dragging = progress > 0.001 && progress < 0.999
         let shape = RoundedRectangle(cornerRadius: progress > 0.001 ? 26 : 0, style: .continuous)
         Group {
             if let s = current {
@@ -70,10 +72,15 @@ struct RootView: View {
         .clipShape(shape)
         .overlay {
             if progress > 0.001 {
-                shape.stroke(Ink.line.opacity(0.5 * progress), lineWidth: 1.6)
+                SketchRect(seed: dragging ? UInt64(Int(progress * 26)) : 900,
+                           corner: 26, wobble: dragging ? 2.2 : 1.3)
+                    .inset(by: 0.5)
+                    .stroke(Ink.line.opacity(0.75 * progress),
+                            style: StrokeStyle(lineWidth: 1.7, lineCap: .round))
             }
         }
-        .offset(x: reveal * progress)
+        .scaleEffect(1 - 0.02 * progress)
+        .offset(x: reveal * progress * 0.88)
         .overlay {
             if progress > 0.001 {
                 Color.clear
@@ -145,6 +152,7 @@ struct SidebarView: View {
     @State private var showSettings = false
     @State private var renaming: ChatSession?
     @State private var draft = ""
+    @State private var ghosts: Set<UUID> = []
 
     private var groups: [ConversationGroup] {
         let dict = Dictionary(grouping: sessions) { Calendar.current.startOfDay(for: $0.updatedAt) }
@@ -172,10 +180,10 @@ struct SidebarView: View {
                     }
                     .padding(.horizontal, 14)
                     .frame(height: 44)
-                    .sketch(seed: 602, capsule: true, double: true)
                     .contentShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(RedrawButtonStyle(shape: SketchCapsule(seed: 602),
+                                               double: true))
             }
             .padding(.horizontal, Gutter.edge)
             .padding(.top, Device.topInset + 14)
@@ -269,6 +277,7 @@ struct SidebarView: View {
 
     private func row(_ s: ChatSession) -> some View {
         let active = current?.id == s.id
+        let ghost = ghosts.contains(s.id)
         return Button {
             app.runtime.persistIfNeeded(session: s, context: context)
             current = s
@@ -284,22 +293,29 @@ struct SidebarView: View {
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 if app.runtime.sessionId == s.id && app.runtime.needsApproval {
-                    Circle().fill(Ink.accent).frame(width: 7, height: 7)
+                    InkDot(color: Ink.accent, breathing: true)
                 } else if app.runtime.sessionId == s.id && app.runtime.isBusy {
                     RedrawSpinner(size: 15)
                 } else if active {
-                    Circle().fill(Ink.line).frame(width: 5, height: 5)
+                    InkDot(size: 5, color: Ink.line)
                 }
             }
             .frame(height: 50)
             .padding(.horizontal, active ? 8 : 0)
             .overlay {
                 if active {
-                    SketchRect(seed: 621, corner: 14, wobble: 1.6)
-                        .stroke(Ink.accent, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                        .offset(x: -6)
+                    SelectionLoop().offset(x: -6)
                 }
             }
+            .opacity(ghost ? 0.14 : 1)
+            .overlay {
+                if ghost {
+                    Hatch(spacing: 5, inset: 3)
+                        .stroke(Ink.faint, lineWidth: 1)
+                        .opacity(0.6)
+                }
+            }
+            .animation(.easeOut(duration: 0.26), value: ghost)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -308,20 +324,31 @@ struct SidebarView: View {
                 draft = s.title
                 renaming = s
             }
-            Button(role: .destructive, action: { delete(s) }) {
+            Button(role: .destructive, action: { erase(s) }) {
                 Label("删除", systemImage: "trash")
             }
         }
     }
 
     private func delete(_ s: ChatSession) {
-        context.delete(s)
-        try? context.save()
-        if current?.id == s.id { current = nil }
+        erase(s)
+    }
+
+    private func erase(_ s: ChatSession) {
+        withAnimation(.easeOut(duration: 0.24)) { ghosts.insert(s.id) }
+        let id = s.id
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+            if let target = sessions.first(where: { $0.id == id }) {
+                context.delete(target)
+                try? context.save()
+            }
+            if current?.id == id { current = nil }
+            ghosts.remove(id)
+        }
     }
 
     private func deleteDay(_ g: ConversationGroup) {
-        for s in g.items { delete(s) }
+        for s in g.items { erase(s) }
     }
 
     private func newConversation() {
@@ -331,6 +358,21 @@ struct SidebarView: View {
         current = s
         withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) { progress = 0 }
         open = false
+    }
+}
+
+struct SelectionLoop: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var p: CGFloat = 0
+
+    var body: some View {
+        RedrawStroke(shape: SketchRect(seed: 621, corner: 14, wobble: 1.7),
+                     color: Ink.accent, width: 1.6, progress: p)
+            .onAppear {
+                guard !reduceMotion else { p = 1; return }
+                p = 0
+                withAnimation(.easeOut(duration: 0.22)) { p = 1 }
+            }
     }
 }
 

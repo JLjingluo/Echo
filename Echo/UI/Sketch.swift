@@ -130,6 +130,158 @@ struct Hatch: Shape {
     }
 }
 
+// MARK: - Rough box: four strokes that overshoot their corners
+
+struct SketchBox: Shape {
+    var seed: UInt64 = 1
+    var wobble: CGFloat = 1.2
+    var overshoot: CGFloat = 2.6
+    var gapSide: Int? = nil
+
+    func path(in r: CGRect) -> Path {
+        let b = r.insetBy(dx: 2, dy: 2)
+        func j(_ i: Int) -> CGFloat { wob(seed, i, wobble) }
+        var p = Path()
+        let corners = [
+            CGPoint(x: b.minX, y: b.minY), CGPoint(x: b.maxX, y: b.minY),
+            CGPoint(x: b.maxX, y: b.maxY), CGPoint(x: b.minX, y: b.maxY),
+        ]
+        for side in 0..<4 {
+            if gapSide == side { continue }
+            let a = corners[side]
+            let c = corners[(side + 1) % 4]
+            let dx = c.x - a.x, dy = c.y - a.y
+            let len = max(1, hypot(dx, dy))
+            let ux = dx / len, uy = dy / len
+            let start = CGPoint(x: a.x - ux * overshoot + j(side * 5),
+                                y: a.y - uy * overshoot + j(side * 5 + 1))
+            let end = CGPoint(x: c.x + ux * overshoot + j(side * 5 + 2),
+                              y: c.y + uy * overshoot + j(side * 5 + 3))
+            let mid = CGPoint(x: (start.x + end.x) / 2 + j(side * 5 + 4) * 1.6,
+                              y: (start.y + end.y) / 2 + j(side * 5 + 9) * 1.6)
+            p.move(to: start)
+            p.addQuadCurve(to: end, control: mid)
+        }
+        return p
+    }
+}
+
+// MARK: - Animatable trim so a line can be "redrawn"
+
+struct TrimmedShape<S: Shape>: Shape {
+    var shape: S
+    var progress: CGFloat = 1
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let full = shape.path(in: rect)
+        guard progress < 0.999 else { return full }
+        return full.trimmedPath(from: 0, to: max(0.001, progress))
+    }
+}
+
+struct RedrawStroke<S: Shape>: View {
+    var shape: S
+    var color: Color = Ink.line
+    var width: CGFloat = Gutter.stroke
+    var progress: CGFloat = 1
+
+    var body: some View {
+        TrimmedShape(shape: shape, progress: progress)
+            .stroke(color, style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+    }
+}
+
+// MARK: - Press = re-stroke the outline
+
+struct RedrawButtonStyle<S: Shape>: ButtonStyle {
+    var shape: S
+    var color: Color = Ink.line
+    var width: CGFloat = Gutter.stroke
+    var fill: Color = .clear
+    var double = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        Label(configuration)
+            .background(fill)
+            .overlay {
+                RedrawStroke(shape: shape, color: color, width: width,
+                             progress: configuration.isPressed ? 0.999 : 1)
+                if double {
+                    RedrawStroke(shape: shape, color: color.opacity(0.26), width: width * 0.75,
+                                 progress: configuration.isPressed ? 0.94 : 1)
+                        .offset(x: 1.4, y: -1.1)
+                }
+            }
+            .offset(y: configuration.isPressed ? 1 : 0)
+            .animation(.easeOut(duration: reduceMotion ? 0.01 : 0.15),
+                       value: configuration.isPressed)
+    }
+}
+
+private struct Label<C: View>: View {
+    let configuration: ButtonStyleConfiguration
+    init(_ c: ButtonStyleConfiguration) { configuration = c }
+    var body: some View { configuration.label }
+}
+
+// MARK: - Paper grain
+
+struct PaperGrain: View {
+    var density: Int = 900
+    var opacity: Double = 0.035
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Canvas { ctx, sz in
+            var s: UInt64 = 0x5EED
+            for _ in 0..<density {
+                s = mix(s)
+                let x = CGFloat(s & 0xFFFF) / 65535 * sz.width
+                let y = CGFloat((s >> 16) & 0xFFFF) / 65535 * sz.height
+                let r = 0.35 + CGFloat((s >> 32) & 0xFF) / 255 * 0.5
+                ctx.fill(Path(ellipseIn: CGRect(x: x, y: y, width: r, height: r)),
+                         with: .color(scheme == .dark ? Color.white : Color.black))
+            }
+        }
+        .opacity(opacity)
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Ink breathing on the accent dot
+
+struct InkDot: View {
+    var size: CGFloat = 7
+    var color: Color = Ink.accent
+    var breathing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var bleed = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .blur(radius: breathing && !reduceMotion && bleed ? 0.9 : 0)
+            .scaleEffect(breathing && !reduceMotion && bleed ? 1.25 : 1)
+            .task(id: breathing) {
+                guard breathing, !reduceMotion else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(Int.random(in: 6000...11000)))
+                    withAnimation(.easeInOut(duration: 0.09)) { bleed = true }
+                    try? await Task.sleep(for: .milliseconds(90))
+                    withAnimation(.easeInOut(duration: 0.16)) { bleed = false }
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Border modifier
 
 struct SketchBorder: ViewModifier {
@@ -175,6 +327,35 @@ extension View {
 
     var paperBackground: some View {
         background(Ink.paper)
+    }
+}
+
+struct BoxBorder: ViewModifier {
+    var seed: UInt64 = 1
+    var color: Color = Ink.line
+    var width: CGFloat = Gutter.stroke
+    var double = true
+    var gapSide: Int? = nil
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            SketchBox(seed: seed, gapSide: gapSide)
+                .stroke(color, style: StrokeStyle(lineWidth: width, lineCap: .round))
+            if double {
+                SketchBox(seed: seed &+ 9, wobble: 1.5, overshoot: 1.8, gapSide: gapSide)
+                    .stroke(color.opacity(0.22),
+                            style: StrokeStyle(lineWidth: width * 0.7, lineCap: .round))
+                    .offset(x: 1.3, y: -1.0)
+            }
+        }
+    }
+}
+
+extension View {
+    func sketchBox(seed: UInt64 = 1, color: Color = Ink.line, width: CGFloat = Gutter.stroke,
+                   double: Bool = true, gapSide: Int? = nil) -> some View {
+        modifier(BoxBorder(seed: seed, color: color, width: width, double: double,
+                           gapSide: gapSide))
     }
 }
 

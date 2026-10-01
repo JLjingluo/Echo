@@ -107,7 +107,8 @@ struct ChatView: View {
                      onOpenSettings: { showSettings = true })
         }
         .padding(.bottom, 5)
-        .background(Ench.background.ignoresSafeArea())
+        .background(Ink.paper.ignoresSafeArea())
+        .overlay { PaperGrain(density: 500).ignoresSafeArea() }
         .onAppear { runtime.persistIfNeeded(session: session, context: context) }
         .onChange(of: runtime.phase) { _, newPhase in
             guard newPhase == .done, app.settings.autoExport else { return }
@@ -196,7 +197,8 @@ struct ChatView: View {
                     }
                     Color.clear.frame(height: 8).id("bottom")
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, Gutter.edge - 6)
+                .animation(.easeOut(duration: 0.24), value: timeline.count)
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollIndicators(.hidden)
@@ -215,6 +217,7 @@ struct ChatView: View {
                 onEdit: { editingText = $0.text; draft = $0.text },
                 onRegenerate: regenerate,
                 onSpeak: { speak($0) })
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
     }
 
     private func regenerate() {
