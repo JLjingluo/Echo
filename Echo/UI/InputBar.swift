@@ -116,9 +116,7 @@ struct InputBar: View {
 
     private var metaRow: some View {
         HStack(spacing: 8) {
-            NavigationLink {
-                SettingsView()
-            } label: {
+            Button(action: onOpenSettings) {
                 HStack(spacing: 5) {
                     Image(systemName: "cpu")
                     Text(shortModel)
@@ -128,6 +126,7 @@ struct InputBar: View {
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .glass(.capsule, interactive: true)
             }
+            .buttonStyle(.plain)
             if app.settings.modelSupportsTools {
                 Button {
                     app.settings.deepThink.toggle()

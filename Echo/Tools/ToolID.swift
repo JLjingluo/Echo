@@ -3,7 +3,7 @@ import Foundation
 enum ToolID: String, CaseIterable, Sendable {
     case write_file, read_file, list_files, delete_file, move_file
     case text_ops, diff_text, run_js, web_fetch, web_search
-    table_to_csv, date_calc, unit_convert, make_qrcode, ocr_image
+    case table_to_csv, date_calc, unit_convert, make_qrcode, ocr_image
 
     var label: String {
         switch self {

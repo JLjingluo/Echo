@@ -129,6 +129,7 @@ struct EmptyState: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 6)
+        .onAppear { round = EchoWheel.round() }
         .animation(.snappy, value: round.title)
     }
 
