@@ -9,6 +9,8 @@ jobs:
   build:
     runs-on: macos-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -127,3 +129,15 @@ jobs:
           path: out/Echo-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish IPA to Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          gh release create v0.10-unsigned --title "Echo 0.10 unsigned" --prerelease \
+            --notes "未签名 IPA：下载后需用自己的 Apple ID 重签（Sideloadly / AltStore / Signulous）"
+          gh release upload v0.10-unsigned out/Echo-unsigned.ipa --clobber
+          gh release edit v0.10-unsigned --latest
+          set -e
+          echo "direct link: https://github.com/${GITHUB_REPOSITORY}/releases/download/v0.10-unsigned/Echo-unsigned.ipa"
