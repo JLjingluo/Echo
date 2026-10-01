@@ -1,0 +1,196 @@
+import SwiftUI
+import UIKit
+import SwiftData
+
+extension Color {
+    init(hex: String) {
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        var v: UInt64 = 0
+        Scanner(string: s).scanHexInt64(&v)
+        let r, g, b, a: Double
+        switch s.count {
+        case 8:
+            r = Double((v >> 24) & 0xFF) / 255; g = Double((v >> 16) & 0xFF) / 255
+            b = Double((v >> 8) & 0xFF) / 255; a = Double(v & 0xFF) / 255
+        default:
+            r = Double((v >> 16) & 0xFF) / 255; g = Double((v >> 8) & 0xFF) / 255
+            b = Double(v & 0xFF) / 255; a = 1
+        }
+        self = Color(.sRGB, red: r, green: g, blue: b, opacity: a)
+    }
+
+    static let bubble = Color(hex: "4D6BFE")
+    static let softText = Color(hex: "8A8F99")
+    static let cardBG = Color(.secondarySystemGroupedBackground)
+    static let codeBG = Color(.systemGroupedBackground)
+}
+
+enum Theme {
+    static let accent = Color(hex: "4D6BFE")
+    static let radius: CGFloat = 14
+}
+
+struct CopyLabel: View {
+    let text: String
+    let systemImage: String
+    @State private var copied = false
+
+    var body: some View {
+        Button {
+            Notifier.copy(text)
+            copied = true
+            Notifier.shared.tap()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copied = false }
+        } label: {
+            Label(copied ? "已复制" : "", systemImage: copied ? "checkmark" : systemImage)
+                .labelStyle(.titleAndIcon)
+                .font(.caption)
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(.secondary)
+    }
+}
+
+struct CodeBlock: View {
+    let code: String
+    let language: String
+    var onSave: (String, String) -> Void = { _, _ in }
+
+    @State private var wrapped = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(language.isEmpty ? "text" : language)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button { wrapped.toggle() } label: {
+                    Image(systemName: "text.justify")
+                        .font(.caption)
+                        .foregroundStyle(wrapped ? Theme.accent : Color.secondary)
+                }
+                .buttonStyle(.borderless)
+                CopyLabel(text: code)
+                Menu {
+                    Button("存为文件", systemImage: "square.and.arrow.down") {
+                        onSave(code, language)
+                    }
+                    Button("分享", systemImage: "square.and.arrow.up") {
+                        ShareHelper.share(items: [code])
+                    }
+                } label: {
+                    Image(systemName: "ellipsis").font(.caption)
+                }
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+
+            Group {
+                if wrapped {
+                    Text(code)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        Text(code)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.trailing, 8)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Color.codeBG, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary, lineWidth: 1))
+        }
+    }
+}
+
+enum ShareHelper {
+    @MainActor
+    static func share(items: [Any]) {
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let root = scene.windows.first?.rootViewController else { return }
+        var top = root
+        while let p = top.presentedViewController { top = p }
+        if let pop = vc.popoverPresentationController {
+            pop.sourceView = top.view
+            pop.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY,
+                                    width: 0, height: 0)
+        }
+        top.present(vc, animated: true)
+    }
+}
+
+struct FileExporter: UIViewControllerRepresentable {
+    let urls: [URL]
+    let onDone: (Bool) -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let vc = UIDocumentPickerViewController(forExporting: urls, asCopy: true)
+        vc.delegate = context.coordinator
+        vc.allowsMultipleSelection = false
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onDone: onDone) }
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let onDone: (Bool) -> Void
+        init(onDone: @escaping (Bool) -> Void) { self.onDone = onDone }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController,
+                            didPickDocumentsAt urls: [URL]) {
+            onDone(true)
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            onDone(false)
+        }
+    }
+}
+
+extension ChatSession {
+    var orderedMessages: [ChatMessage] { messages.sorted { $0.createdAt < $1.createdAt } }
+
+    var previewText: String { orderedMessages.last?.text ?? "" }
+}
+
+extension ChatMessage {
+    var runItems: [RunItem] {
+        if blocks.isEmpty {
+            return [RunItem(kind == .user ? .user : .text, order: 1, text: text, status: .done)]
+        }
+        return sortedBlocks.map { RunItem(block: $0) }
+    }
+
+    private var kind: BlkKind { role == .user ? .user : .text }
+}
+
+extension RunItem {
+    init(block b: MsgBlock) {
+        self.init(id: b.id.uuidString, b.kind, order: b.order, text: b.text, title: b.title,
+                  status: ItemStatusLive(rawValue: b.statusRaw) ?? .done, path: b.path,
+                  language: b.language, steps: b.steps,
+                  argsDisplay: b.kind == .tool ? b.path : "",
+                  startedAt: b.startedAt, endedAt: b.endedAt)
+        if b.kind == .file {
+            file = RunFile(name: b.title, path: b.path,
+                           size: (try? Data(contentsOf: URL(fileURLWithPath: b.path)).count) ?? 0,
+                           preview: b.text)
+        }
+        if b.kind == .tool {
+            call = ToolCallView(id: b.id.uuidString, name: b.title, argsJSON: b.path,
+                                result: b.text,
+                                status: ItemStatus(rawValue: b.statusRaw) ?? .done,
+                                startedAt: b.startedAt, endedAt: b.endedAt)
+        }
+    }
+}

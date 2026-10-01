@@ -1,0 +1,63 @@
+name: Echo
+options:
+  bundleIdPrefix: com.jingluo
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+    MARKETING_VERSION: "0.10"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_PREVIEWS: "YES"
+    DEAD_CODE_STRIPPING: "YES"
+
+targets:
+  Echo:
+    type: application
+    platform: iOS
+    sources:
+      - Echo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jingluo.echo
+        PRODUCT_NAME: Echo
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: Echo/Info.plist
+      properties:
+        CFBundleDisplayName: Echo
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSCameraUsageDescription: 拍照后让 AI 识别图中内容
+        NSPhotoLibraryUsageDescription: 选择图片交给 AI 分析
+        NSMicrophoneUsageDescription: 语音输入转成文字发给 AI
+        NSSpeechRecognitionUsageDescription: 将你的语音识别为文字
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleLocalizations:
+          - zh-Hans
+          - en
+
+schemes:
+  Echo:
+    build:
+      targets:
+        Echo: all
+    run:
+      config: Debug
+    archive:
+      config: Release
