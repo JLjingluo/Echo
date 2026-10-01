@@ -206,6 +206,7 @@ struct ChatView: View {
         for m in ms[idx...] { context.delete(m) }
         try? context.save()
         send(goal: goal, images: [], truncating: nil)
+    }
 
     @ViewBuilder
     private func groupRow(_ g: WorkGroup) -> some View {
