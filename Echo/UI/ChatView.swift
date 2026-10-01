@@ -16,7 +16,7 @@ struct ChatView: View {
     @State private var speaking = false
     @State private var previewFile: RunFile?
     @State private var exportURLs: [URL] = []
-    @State private var showDetails = false
+    @State private var expandedGroups: Set<String> = []
 
     private var runtime: AgentRuntime { app.runtime }
 
@@ -33,9 +33,30 @@ struct ChatView: View {
     private var timeline: [RunItem] {
         var out: [RunItem] = []
         for m in shownMessages { out.append(contentsOf: m.runItems) }
-        if showsLive {
-            out.append(contentsOf: runtime.items.filter { showDetails || !isDetail($0) })
+        if showsLive { out.append(contentsOf: runtime.items) }
+        return out
+    }
+
+    private var nodes: [TimelineNode] {
+        var out: [TimelineNode] = []
+        var buf: [RunItem] = []
+        func flush() {
+            guard !buf.isEmpty else { return }
+            let start = buf.map(\.startedAt).min() ?? .now
+            let end = buf.map(\.endedAt).max() ?? .now
+            let label = WorkDuration.text(end.timeIntervalSince(start))
+            out.append(.group(WorkGroup(id: "grp-" + buf[0].id, items: buf, label: label)))
+            buf = []
         }
+        for item in timeline {
+            if isDetail(item) {
+                buf.append(item)
+            } else {
+                flush()
+                out.append(.item(item))
+            }
+        }
+        flush()
         return out
     }
 
@@ -122,17 +143,14 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(timeline) { item in
-                        ItemRow(item: item,
-                                isEditing: editingText != nil && item.kind == .user
-                                    && item.text == editingText,
-                                onSaveCode: saveCode,
-                                onOpenFile: { previewFile = $0 },
-                                onEdit: { editingText = $0.text; draft = $0.text },
-                                onSpeak: { speak($0) })
-                            .id(item.id)
+                    ForEach(nodes) { node in
+                        switch node {
+                        case .item(let item):
+                            rowFor(item).id(item.id)
+                        case .group(let g):
+                            groupRow(g)
+                        }
                     }
-                    if showDetails { details }
                     Color.clear.frame(height: 8).id("bottom")
                 }
                 .padding(.horizontal, 4)
@@ -145,25 +163,35 @@ struct ChatView: View {
         }
     }
 
+    private func rowFor(_ item: RunItem) -> some View {
+        ItemRow(item: item,
+                isEditing: editingText != nil && item.kind == .user
+                    && item.text == editingText,
+                onSaveCode: saveCode,
+                onOpenFile: { previewFile = $0 },
+                onEdit: { editingText = $0.text; draft = $0.text },
+                onSpeak: { speak($0) })
+    }
+
     @ViewBuilder
-    private var details: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if runtime.toolCount > 0 || runtime.thinkingCount > 0 {
-                Text("\(runtime.thinkingCount) 段思考 · \(runtime.toolCount) 次工具调用")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Ench.secondaryText)
-            }
-            if !files.isEmpty {
-                Button { showWorkspace = true } label: {
-                    Text("\(files.count) 个文件 · +\(runtime.totalAdded)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Ench.secondaryText)
+    private func groupRow(_ g: WorkGroup) -> some View {
+        let live = showsLive && g.items.contains { $0.status == .running }
+        let open = live || expandedGroups.contains(g.id)
+        VStack(spacing: 0) {
+            WorkGroupHeader(text: live ? "正在工作…" : g.label, chevronUp: open) {
+                guard !live else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    if open { expandedGroups.remove(g.id) } else { expandedGroups.insert(g.id) }
                 }
-                .buttonStyle(.plain)
+            }
+            if open {
+                ForEach(g.items) { rowFor($0) }
+                WorkGroupHeader(text: "收起", chevronUp: true) {
+                    withAnimation(.easeInOut(duration: 0.18)) { expandedGroups.remove(g.id) }
+                }
             }
         }
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .id(g.id)
     }
 
     private func scrollTo(_ proxy: ScrollViewProxy) {
@@ -230,6 +258,24 @@ struct ChatView: View {
             Notifier.shared.tap()
         } catch {
             Notifier.shared.runDone(title: "保存失败", body: error.localizedDescription)
+        }
+    }
+}
+
+struct WorkGroup: Identifiable {
+    let id: String
+    let items: [RunItem]
+    let label: String
+}
+
+enum TimelineNode: Identifiable {
+    case item(RunItem)
+    case group(WorkGroup)
+
+    var id: String {
+        switch self {
+        case .item(let i): return i.id
+        case .group(let g): return g.id
         }
     }
 }

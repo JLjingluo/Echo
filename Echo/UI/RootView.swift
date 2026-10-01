@@ -271,8 +271,10 @@ struct SidebarView: View {
                     .font(.system(size: 16))
                     .foregroundColor(Color(.label))
                     .animation(.easeOut(duration: 0.15))
-                if app.runtime.sessionId == s.id && app.runtime.isBusy {
-                    ProgressView().controlSize(.mini).frame(width: 12, height: 12)
+                if app.runtime.sessionId == s.id && app.runtime.needsApproval {
+                    StatusDot(color: .orange, pulsing: true)
+                } else if app.runtime.sessionId == s.id && app.runtime.isBusy {
+                    StatusDot(color: .green, pulsing: true)
                 }
                 Spacer()
             }

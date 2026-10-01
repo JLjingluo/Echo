@@ -282,8 +282,9 @@ struct ToolRow: View {
             .buttonStyle(GrowingButton())
             if open {
                 VStack(spacing: 8) {
+                    if failed, !result.isEmpty { ToolErrorBox(message: result) }
                     if !args.isEmpty { CodePanel(label: "参数", code: args) }
-                    if !result.isEmpty { CodePanel(label: "结果", code: result) }
+                    if !result.isEmpty, !failed { CodePanel(label: "结果", code: result) }
                 }
                 .padding(.leading, 29)
             }
@@ -308,41 +309,48 @@ struct FileRow: View {
         if let f = item.file {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
                 AssistantAvatar().offset(CGSize(width: 0, height: 6))
-                Button { onOpen(f) } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: icon(f.ext))
-                            .font(.system(size: 15))
-                            .foregroundStyle(Ench.secondaryText)
-                        Text(f.name)
-                            .font(.system(size: Ench.body, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer(minLength: 6)
-                        Text("+\(f.added)")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.green)
-                        if f.removed > 0 {
-                            Text("−\(f.removed)")
+                VStack(alignment: .leading, spacing: 0) {
+                    Button { onOpen(f) } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: icon(f.ext))
+                                .font(.system(size: 15))
+                                .foregroundStyle(Ench.secondaryText)
+                            Text(f.name)
+                                .font(.system(size: Ench.body, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 6)
+                            Text("+\(f.added)")
                                 .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.red)
+                                .foregroundStyle(DiffTheme.addText)
+                            if f.removed > 0 {
+                                Text("−\(f.removed)")
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundStyle(DiffTheme.delText)
+                            }
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Ench.tertiaryText)
                         }
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Ench.tertiaryText)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Ench.cardFill)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Ench.cardStroke, lineWidth: 1)
-                    )
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+
+                    if f.isText {
+                        Divider().overlay(Ench.divider)
+                        DiffCard(file: f)
+                    }
                 }
-                .buttonStyle(.plain)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Ench.cardFill)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Ench.cardStroke, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .padding(.leading, 8)
             }
         }
@@ -455,5 +463,101 @@ struct ErrorRow: View {
                 CodePanel(label: "原始返回", code: text)
             }
         }
+    }
+}
+
+struct WorkGroupHeader: View {
+    let text: String
+    var chevronUp = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(text)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Ench.secondaryText)
+                    .lineLimit(1)
+                Image(systemName: chevronUp ? "chevron.up" : "chevron.right")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Ench.secondaryText)
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 28)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(GrowingButton())
+        .padding(.vertical, 8)
+    }
+}
+
+struct ToolErrorBox: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(DiffTheme.delText)
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundStyle(DiffTheme.delText)
+                .lineLimit(6)
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 6).fill(DiffTheme.delFill))
+        .overlay(RoundedRectangle(cornerRadius: 6)
+            .stroke(DiffTheme.delText.opacity(0.35), lineWidth: 1))
+    }
+}
+
+struct DiffCard: View {
+    let file: RunFile
+    private let limit = 8
+
+    @State private var lines: [String] = []
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { i, l in
+                HStack(alignment: .top, spacing: 8) {
+                    Text("\(i + 1)")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Ench.tertiaryText)
+                        .frame(width: 22, alignment: .trailing)
+                    Text(l.isEmpty ? " " : "+ " + l)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(DiffTheme.addText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DiffTheme.addFill)
+            }
+            if file.added > limit {
+                Text("还有 \(file.added - limit) 行，点文件名看完整内容")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Ench.tertiaryText)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .task(id: file.path) { await load() }
+    }
+
+    private func load() async {
+        guard lines.isEmpty else { return }
+        let path = file.path
+        lines = await Task.detached(priority: .userInitiated) { () -> [String] in
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return [] }
+            let text = String(decoding: data, as: UTF8.self)
+            return Array(text.components(separatedBy: "\n").prefix(limit))
+        }.value
     }
 }

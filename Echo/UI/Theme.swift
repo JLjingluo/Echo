@@ -101,6 +101,44 @@ enum EchoFont {
     }
 }
 
+struct StatusDot: View {
+    let color: Color
+    var pulsing = false
+    var size: CGFloat = 6
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dim = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size, height: size)
+            .opacity(pulsing && !reduceMotion ? (dim ? 0.3 : 1) : 1)
+            .onAppear {
+                guard pulsing, !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) {
+                    dim = true
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: pulsing)
+    }
+}
+
+enum WorkDuration {
+    static func text(_ seconds: Double) -> String {
+        let s = Int(max(0, seconds).rounded())
+        if s < 60 { return "工作了 \(s) 秒" }
+        return "工作了 \(s / 60) 分 \(String(format: "%02d", s % 60)) 秒"
+    }
+}
+
+struct DiffTheme {
+    static let addText = Color(light: Color(rgba: 0x1a7f37ff), dark: Color(rgba: 0x56d364ff))
+    static let addFill = Color(light: Color(rgba: 0xdafbe1ff), dark: Color(rgba: 0x1a2f22ff))
+    static let delText = Color(light: Color(rgba: 0xcf222eff), dark: Color(rgba: 0xff7b72ff))
+    static let delFill = Color(light: Color(rgba: 0xffebeaff), dark: Color(rgba: 0x331c1eff))
+    static let gutter = Color(light: Color(rgba: 0xf6f8faff), dark: Color(rgba: 0x21262dff))
+}
+
 struct EchoIcon: View {
     let name: String
     var size: CGFloat = 20
