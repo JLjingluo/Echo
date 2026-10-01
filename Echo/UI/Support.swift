@@ -74,7 +74,7 @@ struct CodeBlock: View {
                         .foregroundStyle(wrapped ? Theme.accent : Color.secondary)
                 }
                 .buttonStyle(.borderless)
-                CopyLabel(text: code)
+                CopyLabel(text: code, systemImage: "doc.on.doc")
                 Menu {
                     Button("存为文件", systemImage: "square.and.arrow.down") {
                         onSave(code, language)
