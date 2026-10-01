@@ -10,7 +10,6 @@ struct ChatView: View {
     @State private var draft = ""
     @State private var showWorkspace = false
     @State private var showSettings = false
-    @State private var showMore = false
     @State private var showDetails = false
     @State private var speaking = false
     @State private var renaming = false
@@ -49,12 +48,37 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if timeline.isEmpty {
+                EmptyState(onPick: { draft = $0 }, openModel: { showSettings = true })
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                timelineScroll
+            }
+            InputBar(text: $draft, session: session, onOpenSettings: { showSettings = true })
+        }
+        .background(Color(.systemBackground))
+        .onAppear { runtime.persistIfNeeded(session: session, context: context) }
+        .onChange(of: runtime.phase) { _, newPhase in
+            guard newPhase == .done, app.settings.autoExport else { return }
+            let urls = runtime.runFiles.map { URL(fileURLWithPath: $0.path) }
+                .filter { FileManager.default.fileExists(atPath: $0.path) }
+            if !urls.isEmpty { exportURLs = urls }
+        }
+        .sheet(isPresented: $showWorkspace) { WorkspaceView() }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(item: $previewFile) { FilePreviewView(file: $0) }
+        .alert("重命名会话", isPresented: $renaming) {
+            TextField("标题", text: $newName)
+            Button("好") { session.title = newName; try? context.save() }
+            Button("取消", role: .cancel) {}
+        }
+        .modifier(ExportModifier(urls: $exportURLs))
+    }
+
+    private var timelineScroll: some View {
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 12) {
-                        if timeline.isEmpty {
-                            EmptyState { draft = $0 }
-                        }
                         ForEach(timeline) { item in
                             ItemRow(item: item, onSaveCode: saveCode, onOpenFile: { previewFile = $0 })
                                 .id(item.id)
@@ -75,66 +99,43 @@ struct ChatView: View {
                     if atBottom { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
             }
-            InputBar(text: $draft, session: session, onOpenSettings: { showSettings = true })
-        }
-        .background(Color(.systemBackground))
-        .onAppear { runtime.persistIfNeeded(session: session, context: context) }
-        .onChange(of: runtime.phase) { _, newPhase in
-            guard newPhase == .done, app.settings.autoExport else { return }
-            let urls = runtime.runFiles.map { URL(fileURLWithPath: $0.path) }
-                .filter { FileManager.default.fileExists(atPath: $0.path) }
-            if !urls.isEmpty { exportURLs = urls }
-        }
-        .sheet(isPresented: $showWorkspace) { WorkspaceView() }
-        .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(item: $previewFile) { FilePreviewView(file: $0) }
-        .confirmationDialog("更多", isPresented: $showMore, titleVisibility: .hidden) {
-            Button("重命名会话") { newName = session.title; renaming = true }
-            Button("导出全部文件到「文件」App", systemImage: "folder") { exportAll() }
-            Button("清空本次执行过程", systemImage: "eraser") { clearLive() }
-            Button("删除会话", role: .destructive) { deleteSession() }
-        }
-        .alert("重命名会话", isPresented: $renaming) {
-            TextField("标题", text: $newName)
-            Button("好") { session.title = newName; try? context.save() }
-            Button("取消", role: .cancel) {}
-        }
-        .modifier(ExportModifier(urls: $exportURLs))
     }
 
     private var header: some View {
         HStack(spacing: 10) {
             GlassIconButton(system: "line.3.horizontal", hint: "会话列表", action: onMenu)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(session.title)
-                    .font(.system(size: 17, weight: .bold))
-                    .lineLimit(1)
-                Text(app.statusLine)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            HStack(spacing: 16) {
-                Button { showWorkspace = true } label: {
-                    Image(systemName: "folder")
-                        .font(.system(size: 17))
+            Spacer(minLength: 8)
+            Menu {
+                Button { showSettings = true } label: { Label("厂商与模型", systemImage: "sparkles") }
+                Button { showWorkspace = true } label: { Label("工作区文件", systemImage: "folder") }
+                Button { newName = session.title; renaming = true } label: { Label("重命名会话", systemImage: "pencil") }
+                Button { exportAll() } label: { Label("导出全部文件到「文件」", systemImage: "square.and.arrow.up") }
+                Button { clearLive() } label: { Label("清空执行过程", systemImage: "eraser") }
+                Divider()
+                Button(role: .destructive) { deleteSession() } label: { Label("删除会话", systemImage: "trash") }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Echo")
+                        .font(.system(size: 14.5, weight: .heavy, design: .rounded))
                         .foregroundStyle(.primary)
-                        .frame(width: 26, height: 34)
-                        .contentShape(Rectangle())
+                    Text("·")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                    Text(app.vendorName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.tertiary)
                 }
-                Button { showMore = true } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 17))
-                        .foregroundStyle(.primary)
-                        .frame(width: 26, height: 34)
-                        .contentShape(Rectangle())
-                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .glass(.capsule)
+                .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-            .glass(.capsule)
+            .menuIndicator(.hidden)
+            .fixedSize()
         }
         .padding(.horizontal, 14)
         .padding(.top, 6)

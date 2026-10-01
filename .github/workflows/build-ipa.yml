@@ -34,6 +34,8 @@ jobs:
       - name: Build for iOS device (unsigned)
         continue-on-error: true
         run: |
+          set +e
+          mkdir -p build out
           xcodebuild \
             -project Echo.xcodeproj \
             -scheme Echo \
@@ -44,7 +46,9 @@ jobs:
             CODE_SIGN_IDENTITY= \
             CODE_SIGNING_REQUIRED=NO \
             PROVISIONING_PROFILE_SPECIFIER= \
-            build > build/build.log 2>&1; echo "BUILD_EXIT=$?" >> "$GITHUB_ENV"
+            build > build/build.log 2>&1
+          echo "BUILD_EXIT=$?" >> "$GITHUB_ENV"
+          tail -40 build/build.log
         shell: bash
 
       - name: Report errors as annotations
