@@ -224,7 +224,7 @@ struct RedrawButtonStyle<S: Shape>: ButtonStyle {
     }
 }
 
-private struct PressLabel<C: View>: View {
+private struct PressLabel: View {
     let configuration: ButtonStyleConfiguration
     init(_ c: ButtonStyleConfiguration) { configuration = c }
     var body: some View { configuration.label }
