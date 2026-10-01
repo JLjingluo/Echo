@@ -207,7 +207,7 @@ struct RedrawButtonStyle<S: Shape>: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
-        Label(configuration)
+        PressLabel(configuration)
             .background(fill)
             .overlay {
                 RedrawStroke(shape: shape, color: color, width: width,
@@ -224,7 +224,7 @@ struct RedrawButtonStyle<S: Shape>: ButtonStyle {
     }
 }
 
-private struct Label<C: View>: View {
+private struct PressLabel<C: View>: View {
     let configuration: ButtonStyleConfiguration
     init(_ c: ButtonStyleConfiguration) { configuration = c }
     var body: some View { configuration.label }
