@@ -134,9 +134,10 @@ struct InputBar: View {
         .padding(.horizontal, 8)
         .frame(minHeight: 50)
         .background(Ink.paper)
-        .sketch(seed: 420, capsule: true, double: hasInput,
+        .sketch(seed: 420, capsule: true,
                 color: isRecording ? Ink.accent : Ink.line,
                 width: isRecording ? 2.2 : Gutter.stroke,
+                double: hasInput,
                 gap: hasInput ? nil : 7)
         .contentShape(Rectangle())
         .onTapGesture { focused = true }
