@@ -283,8 +283,10 @@ struct QuickLookPreview: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ c: QLPreviewController, context: Context) {
-        context.coordinator.url = url
-        c.reloadDataSource()
+        if context.coordinator.url != url {
+            context.coordinator.url = url
+            c.reloadData()
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(url: url) }
