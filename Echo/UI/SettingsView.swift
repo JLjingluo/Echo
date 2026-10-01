@@ -119,7 +119,7 @@ struct SettingsView: View {
         @Bindable var app = app
         Section("生成") {
             Toggle("流式输出", isOn: $app.settings.stream)
-            Picker("深度思考") {
+            Picker("深度思考", selection: $app.settings.thinkingMode) {
                 Text("自动").tag("auto")
                 Text("强制开").tag("on")
                 Text("强制关").tag("off")
