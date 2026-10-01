@@ -14,22 +14,22 @@ struct RootView: View {
         GeometryReader { geo in
             let w = max(geo.size.width * EchoM.drawerFraction, 1)
             ZStack(alignment: .leading) {
-                EchoTheme.background(scheme).ignoresSafeArea()
+                Ench.background.ignoresSafeArea()
 
                 SidebarView(current: $current, progress: $progress, open: $open,
                             sessions: sessions, reveal: w, insets: geo.safeAreaInsets)
                     .frame(width: w)
                     .frame(maxHeight: .infinity, alignment: .leading)
-                    .background(EchoTheme.background(scheme))
+                    .background(Ench.background)
                     .scaleEffect(EchoM.closedScale + (1 - EchoM.closedScale) * progress,
                                  anchor: .leading)
                     .overlay {
-                        EchoTheme.background(scheme)
+                        Ench.background
                             .opacity(EchoM.sidebarVeil * (1 - min(max(progress, 0), 1)))
                     }
                     .allowsHitTesting(progress > 0.001)
 
-                detail(insets: geo.safeAreaInsets, reveal: w)
+                detail(reveal: w)
 
                 if progress <= 0.001 {
                     HStack {
@@ -40,7 +40,6 @@ struct RootView: View {
                         Spacer()
                     }
                     .frame(maxHeight: .infinity)
-                    .allowsHitTesting(true)
                 }
             }
         }
@@ -50,11 +49,13 @@ struct RootView: View {
     }
 
     @ViewBuilder
-    private func detail(insets: EdgeInsets, reveal: CGFloat) -> some View {
+    private func detail(reveal: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: progress > 0.001 ? 30 : 0, style: .continuous)
         Group {
             if let s = current {
-                ChatView(session: s, onMenu: { settle(true) })
+                ChatView(session: s,
+                         onMenu: { settle(true) },
+                         onNew: { newSession(); settle(false) })
                     .id(s.id)
             } else {
                 ProgressView().controlSize(.large)
@@ -62,7 +63,7 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(EchoTheme.background(scheme))
+        .background(Ench.background)
         .clipShape(shape)
         .overlay { shape.strokeBorder(Color.primary.opacity(0.2 * progress), lineWidth: 1) }
         .overlay { Color.white.opacity(EchoM.contentScrim * progress) }
@@ -123,10 +124,14 @@ struct RootView: View {
     }
 }
 
+struct ConversationGroup: Hashable {
+    let date: Date
+    var items: [ChatSession]
+}
+
 struct SidebarView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
-    @Environment(\.colorScheme) private var scheme
     @Binding var current: ChatSession?
     @Binding var progress: CGFloat
     @Binding var open: Bool
@@ -137,48 +142,84 @@ struct SidebarView: View {
     @State private var renaming: ChatSession?
     @State private var draft = ""
 
+    private var groups: [ConversationGroup] {
+        let dict = Dictionary(grouping: sessions) { Calendar.current.startOfDay(for: $0.updatedAt) }
+        return dict.map { ConversationGroup(date: $0.key, items: $0.value) }
+            .sorted { $0.date > $1.date }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Echo")
-                .font(EchoFont.wordmark(26))
-                .foregroundStyle(EchoTheme.primaryText(scheme))
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .padding(.horizontal, 18)
-                .padding(.top, insets.top)
+            Button(action: newConversation) {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 16))
+                    Text("新会话").font(.system(size: 16, weight: .medium))
+                    Spacer()
+                }
+                .foregroundStyle(Color(.label))
+                .padding(.horizontal, 14)
+                .frame(height: 40)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(GrowingButton())
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text("会话")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text("\(sessions.count)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.horizontal, EchoM.sectionInset)
-                    .padding(.top, 20)
-                    .padding(.bottom, 6)
+                VStack(alignment: .leading, spacing: 17) {
+                    ForEach(groups, id: \.date) { g in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(g.date.daysAgoString())
+                                    .font(.system(size: 14))
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(Color(.systemGray))
+                                Spacer()
+                            }
+                            .contextMenu {
+                                Button(role: .destructive, action: { deleteDay(g) }) {
+                                    Label("删除当天全部会话", systemImage: "trash")
+                                }
+                            }
 
-                    ForEach(sessions) { s in row(s) }
+                            ForEach(g.items) { s in row(s) }
+
+                            Divider()
+                        }
+                    }
 
                     if sessions.isEmpty {
                         Text("还没有会话")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, EchoM.sectionInset)
-                            .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(.systemGray))
                     }
                 }
-                .padding(.horizontal, EchoM.contentInset)
-                .padding(.top, 10)
-                .padding(.bottom, insets.bottom + EchoM.footerClear)
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, insets.bottom + 40)
             }
             .scrollIndicators(.hidden)
             .contentShape(Rectangle())
             .gesture(dismissDrag)
-            .overlay(alignment: .bottom) { footer }
+
+            HStack(spacing: 10) {
+                Text("Echo")
+                    .font(.system(size: 22, weight: .thin))
+                    .foregroundStyle(Ench.brandGradient)
+                Spacer()
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color(.label))
+                        .frame(width: 40, height: 40)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(GrowingButton())
+                .accessibilityLabel("设置")
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, max(insets.bottom, 12))
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $showSettings) { SettingsView() }
@@ -213,42 +254,30 @@ struct SidebarView: View {
     }
 
     private func row(_ s: ChatSession) -> some View {
-        let active = current?.id == s.id
-        return Button {
+        Button {
             app.runtime.persistIfNeeded(session: s, context: context)
             current = s
-            withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) {
-                progress = 0
-            }
+            withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) { progress = 0 }
             open = false
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    Text(s.title.isEmpty ? "新会话" : s.title)
-                        .font(.body)
-                        .foregroundStyle(EchoTheme.primaryText(scheme))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    indicator(s)
-                }
-                Text(s.previewText.trimmed.isEmpty ? "还没有内容" : s.previewText.trimmed)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Circle()
+                    .frame(width: 6, height: 6)
+                    .animation(.easeOut(duration: 0.15))
+                    .transition(.opacity)
+                    .showIf(current?.id == s.id)
+                Text(s.title.isEmpty ? "新会话" : s.title)
                     .lineLimit(1)
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, 10)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: EchoM.rowHeight)
-            .background {
-                if active {
-                    Rectangle()
-                        .fill(EchoTheme.selectionFill(scheme))
-                        .padding(.leading, -(EchoM.contentInset + insets.leading))
-                        .padding(.trailing, -(EchoM.contentInset + insets.trailing))
+                    .font(.system(size: 16))
+                    .foregroundColor(Color(.label))
+                    .animation(.easeOut(duration: 0.15))
+                if app.runtime.sessionId == s.id && app.runtime.isBusy {
+                    ProgressView().controlSize(.mini).frame(width: 12, height: 12)
                 }
+                Spacer()
             }
+            .animation(.easeOut(duration: 0.15))
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -257,64 +286,28 @@ struct SidebarView: View {
                 draft = s.title
                 renaming = s
             }
-            Button("删除", systemImage: "trash", role: .destructive) {
-                context.delete(s)
-                try? context.save()
-                if current?.id == s.id { current = nil }
+            Button(role: .destructive, action: { delete(s) }) {
+                Label("删除", systemImage: "trash")
             }
         }
     }
 
-    @ViewBuilder
-    private func indicator(_ s: ChatSession) -> some View {
-        if app.runtime.sessionId == s.id && app.runtime.needsApproval {
-            Text("等待批准")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.mint)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(.mint.opacity(0.16), in: Capsule())
-                .fixedSize()
-        } else if app.runtime.sessionId == s.id && app.runtime.isBusy {
-            ProgressView()
-                .controlSize(.mini)
-                .tint(.primary)
-                .frame(width: 14, height: 14)
-        } else if app.runtime.sessionId == s.id && app.runtime.phase == .failed {
-            EchoIcon("exclamationmark.circle", size: 14).foregroundStyle(.red)
-        }
+    private func delete(_ s: ChatSession) {
+        context.delete(s)
+        try? context.save()
+        if current?.id == s.id { current = nil }
     }
 
-    private var footer: some View {
-        HStack(spacing: 10) {
-            EchoGlassButton("新会话", systemImage: "square.and.pencil", style: .prominent,
-                            maxWidth: nil) {
-                let s = ChatSession()
-                context.insert(s)
-                try? context.save()
-                current = s
-                withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) {
-                    progress = 0
-                }
-                open = false
-            }
-            .font(.body.weight(.semibold))
+    private func deleteDay(_ g: ConversationGroup) {
+        for s in g.items { delete(s) }
+    }
 
-            Spacer(minLength: 12)
-
-            Button { showSettings = true } label: {
-                EchoIcon("gearshape", size: 19)
-                    .foregroundStyle(EchoTheme.primaryText(scheme))
-                    .frame(width: 38, height: 38)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .glass(.circle)
-            .accessibilityLabel("设置")
-        }
-        .padding(.leading, EchoM.contentInset + 4)
-        .padding(.trailing, EchoM.contentInset + 4)
-        .frame(height: EchoM.touch + 8)
-        .padding(.bottom, max(insets.bottom, 12))
+    private func newConversation() {
+        let s = ChatSession()
+        context.insert(s)
+        try? context.save()
+        current = s
+        withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) { progress = 0 }
+        open = false
     }
 }

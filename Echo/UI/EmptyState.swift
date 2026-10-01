@@ -42,128 +42,126 @@ private let echoSuggestions: [Suggestion] = [
     Suggestion(icon: "timer", text: "写个喝水提醒脚本，工作日每小时一次"),
     Suggestion(icon: "list.bullet.rectangle", text: "说明书太啰嗦，精简成 8 条注意事项"),
     Suggestion(icon: "sparkles", text: "把这个想法拆成能今晚就动手的小步骤"),
+    Suggestion(icon: "globe", text: "抓一下这个网页，只留作者的核心结论"),
+    Suggestion(icon: "square.and.arrow.down", text: "做一个能离线打开的 HTML 小工具页"),
 ]
 
 enum EchoWheel {
     private static let bagKey = "echo.wheel.bag"
     private static let prevKey = "echo.wheel.prev"
-    private static let titleKey = "echo.wheel.title"
-    private static let titles = ["从一个项目开始。", "从一个任务开始。", "今天想做点什么？"]
 
-    fileprivate static func round() -> (title: String, picks: [Suggestion]) {
+    static func picks(_ count: Int = 4) -> [Suggestion] {
         let d = UserDefaults.standard
         var bag = (d.array(forKey: bagKey) as? [Int]) ?? []
-        if bag.count < 3 {
+        if bag.count < count {
             var fresh = Array(0..<echoSuggestions.count).shuffled()
             let prev = Set((d.array(forKey: prevKey) as? [Int]) ?? [])
             var guardCount = 0
-            while Set(fresh.prefix(3)).isSubset(of: prev) && guardCount < 6 {
+            while Set(fresh.prefix(count)).isSubset(of: prev) && guardCount < 6 {
                 fresh.shuffle()
                 guardCount += 1
             }
             bag = fresh
         }
-        let ids = Array(bag.prefix(3))
-        bag.removeFirst(3)
+        let ids = Array(bag.prefix(count))
+        bag.removeFirst(ids.count)
         d.set(bag, forKey: bagKey)
         d.set(ids, forKey: prevKey)
-        let t = d.integer(forKey: titleKey) % titles.count
-        d.set((t + 1) % titles.count, forKey: titleKey)
-        return (titles[t], ids.map { echoSuggestions[$0] })
+        return ids.map { echoSuggestions[$0] }
     }
 }
 
 struct EmptyState: View {
     @Environment(AppState.self) private var app
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.dynamicTypeSize) private var dynamicType
-    var onPick: (String) -> Void
-    var openModel: () -> Void = {}
+    var sendPrompt: (String) -> Void
 
-    @State private var round = EchoWheel.round()
-    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
+    @State private var prompts: [Suggestion] = []
+    @State private var visibleItems = Set<Int>()
+    @State private var isKeyboardVisible = false
+
+    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            EchoIcon("sparkles", size: 28)
-                .foregroundStyle(EchoTheme.primaryText(scheme))
-
-            Text(round.title)
-                .font(.system(size: titleSize, weight: .bold))
-                .foregroundStyle(EchoTheme.primaryText(scheme))
-                .lineLimit(dynamicType.isAccessibilitySize ? nil : 1)
-                .minimumScaleFactor(dynamicType.isAccessibilitySize ? 1 : 0.45)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.trailing, 24)
-
-            Text("描述目标、贴进资料，或从相册丢一张图进来。Echo 在手机本地拆解任务、跑工具，产出直接交给你。")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .lineLimit(4)
-                .fixedSize(horizontal: false, vertical: true)
-
-            modelRow
-                .padding(.top, 6)
-
-            FlowLayout(spacing: 10) {
-                ForEach(round.picks, id: \.self) { s in
-                    Button {
-                        Notifier.shared.tap()
-                        onPick(s.text)
-                    } label: {
-                        HStack(spacing: 8) {
-                            EchoIcon(s.icon, size: 15).frame(width: 18)
-                            Text(s.text)
-                                .font(.subheadline.weight(.medium))
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                        }
-                        .foregroundStyle(EchoTheme.primaryText(scheme))
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: EchoM.rowHeight)
-                        .glass(.capsule, interactive: true)
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.top, 14)
-        }
-        .echoColumn(nil)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .onAppear { round = EchoWheel.round() }
-        .animation(.smooth(duration: 0.24), value: round.title)
-    }
-
-    private var modelRow: some View {
-        Button(action: openModel) {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 6) {
-                    Text(app.vendorName)
-                        .font(.body.weight(.medium))
-                        .underline()
-                        .foregroundStyle(EchoTheme.primaryText(scheme))
-                        .lineLimit(1)
-                    Text(app.settings.model.isEmpty ? "选择模型" : app.settings.model)
-                        .font(.system(.subheadline, design: .monospaced))
-                        .underline()
-                        .foregroundStyle(.secondary)
+        VStack {
+            Spacer()
+            VStack(spacing: 25) {
+                VStack(spacing: 6) {
+                    Text("Echo")
+                        .font(.system(size: 46, weight: .thin))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Ench.brandGradient)
+                    Text(app.apiKey.isEmpty
+                         ? "还没填 \(app.vendorName) 的 Key"
+                         : "\(app.vendorName) · \(app.settings.model)")
+                        .font(.system(size: Ench.body))
+                        .foregroundStyle(Ench.secondaryText)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    if app.apiKey.isEmpty {
-                        Text("未填 Key")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.red)
-                    }
-                    Spacer(minLength: 0)
                 }
-                Rectangle()
-                    .fill(Color.primary.opacity(0.16))
-                    .frame(height: 0.8)
+
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 15) {
+                    ForEach(0..<prompts.count, id: \.self) { index in
+                        card(prompts[index], index: index)
+                    }
+                }
+                .frame(maxWidth: 700)
+                .padding()
+                .transition(.opacity.combined(with: .slide))
+                .showIf(!isKeyboardVisible)
             }
-            .contentShape(Rectangle())
+            Spacer()
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("厂商与模型")
+        .onAppear {
+            prompts = EchoWheel.picks()
+            for index in 0..<prompts.count {
+                DispatchQueue.main.async { visibleItems.insert(index) }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            let end = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect) ?? .zero
+            isKeyboardVisible = end.height > 0
+        }
     }
+
+    private func card(_ s: Suggestion, index: Int) -> some View {
+        Button {
+            sendPrompt(s.text)
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(s.text)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Ench.text)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 8)
+                HStack {
+                    Spacer()
+                    Image(systemName: s.icon)
+                        .imageScale(.medium)
+                        .foregroundStyle(Color.secondary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+            .padding(15)
+            .background(Color.gray5Custom, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.gray4Custom.opacity(0.35), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .opacity(visibleItems.contains(index) ? 1 : 0)
+        .animation(.easeOut(duration: 0.3).delay(0.2 * Double(index)), value: visibleItems)
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(s.text))
+    }
+}
+
+extension Color {
+    static let gray4Custom = Color(light: Color(rgba: 0xd0d0_d3ff), dark: Color(rgba: 0x4244_4eff))
+    static let gray5Custom = Color(light: Color(rgba: 0xf7f7_f9ff), dark: Color(rgba: 0x2526_2aff))
+    static let labelCustom = Color(light: Color(rgba: 0x0606_06ff), dark: Color(rgba: 0xfbfb_fcff))
+    static let gray3Custom = Color(light: Color(rgba: 0x6b6e_7bff), dark: Color(rgba: 0x9294_a0ff))
 }

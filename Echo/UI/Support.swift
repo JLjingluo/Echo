@@ -24,6 +24,117 @@ extension Color {
     static let softText = Color(hex: "8A8F99")
     static let cardBG = Color(.secondarySystemGroupedBackground)
     static let codeBG = Color(.systemGroupedBackground)
+
+    init(light: Color, dark: Color) {
+        self.init(UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light)
+        })
+    }
+
+    init(rgba: UInt32) {
+        self.init(.sRGB,
+                  red: Double((rgba >> 24) & 0xFF) / 255,
+                  green: Double((rgba >> 16) & 0xFF) / 255,
+                  blue: Double((rgba >> 8) & 0xFF) / 255,
+                  opacity: Double(rgba & 0xFF) / 255)
+    }
+}
+
+enum Ench {
+    static let text = Color(light: Color(rgba: 0x0606_06ff), dark: Color(rgba: 0xfbfb_fcff))
+    static let secondaryText = Color(light: Color(rgba: 0x6b6e_7bff), dark: Color(rgba: 0x9294_a0ff))
+    static let tertiaryText = Color(light: Color(rgba: 0x6b6e_7bff), dark: Color(rgba: 0x6d70_7dff))
+    static let background = Color(light: .white, dark: Color(rgba: 0x1819_1dff))
+    static let secondaryBackground = Color(light: Color(rgba: 0xf7f7_f9ff), dark: Color(rgba: 0x2526_2aff))
+    static let link = Color(light: Color(rgba: 0x2c65_cfff), dark: Color(rgba: 0x4c8e_f8ff))
+    static let border = Color(light: Color(rgba: 0xe4e4_e8ff), dark: Color(rgba: 0x4244_4eff))
+    static let divider = Color(light: Color(rgba: 0xd0d0_d3ff), dark: Color(rgba: 0x3334_38ff))
+    static let cardFill = Color(light: Color(rgba: 0xf7f7_f9ff), dark: Color(rgba: 0x2526_2aff))
+    static let cardStroke = Color(light: Color(rgba: 0xe4e4_e8ff), dark: Color(rgba: 0x4244_4eff)).opacity(0.35)
+    static let brand = [Color(hex: "4285f4"), Color(hex: "9b72cb"),
+                        Color(hex: "d96570"), Color(hex: "d96570")]
+    static var brandGradient: LinearGradient {
+        LinearGradient(colors: brand, startPoint: .leading, endPoint: .trailing)
+    }
+    static let body = CGFloat(14)
+}
+
+struct GrowingButton: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 1.2 : 1)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+extension View {
+    func showIf(_ bool: Bool) -> some View {
+        modifier(ConditionalView(show: bool))
+    }
+}
+
+struct ConditionalView: ViewModifier {
+    let show: Bool
+    func body(content: Content) -> some View {
+        Group {
+            if show { content } else { EmptyView() }
+        }
+    }
+}
+
+struct RunningBorder: ViewModifier {
+    @State private var rotation = 0.0
+    var animated: Bool
+
+    func body(content: Content) -> some View {
+        if animated {
+            content
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(
+                            AngularGradient(
+                                gradient: Gradient(colors: [.indigo, .blue, .red, .orange, .indigo]),
+                                center: .center,
+                                startAngle: .degrees(rotation),
+                                endAngle: .degrees(rotation + 360)
+                            ).opacity(0.5),
+                            lineWidth: 3.5
+                        )
+                )
+                .onAppear {
+                    withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                        rotation = 360
+                    }
+                }
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func runningBorder(animated: Bool) -> some View {
+        modifier(RunningBorder(animated: animated))
+    }
+}
+
+extension Date {
+    func daysAgoString() -> String {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let day = cal.startOfDay(for: self)
+        let diff = cal.dateComponents([.day], from: day, to: today).day ?? 0
+        switch diff {
+        case 0: return "今天"
+        case 1: return "昨天"
+        case 2: return "前天"
+        default:
+            if diff < 7 { return "\(diff) 天前" }
+            let f = DateFormatter()
+            f.dateFormat = "M 月 d 日"
+            return f.string(from: self)
+        }
+    }
 }
 
 enum Theme {
@@ -59,81 +170,57 @@ struct CodeBlock: View {
     let language: String
     var onSave: (String, String) -> Void = { _, _ in }
 
-    @State private var wrapped = false
     @State private var copied = false
 
+    private var lang: String {
+        let l = language.trimmingCharacters(in: .whitespaces)
+        return l.isEmpty ? "code" : l.components(separatedBy: " ").first ?? "code"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
-                Text(verbatim: language.isEmpty ? "text" : language)
-                    .font(.caption.weight(.medium))
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Button { wrapped.toggle() } label: {
-                    EchoIcon("text.alignleft", size: 15)
-                        .foregroundStyle(wrapped ? Color.primary : Color.secondary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+        VStack(spacing: 0) {
+            HStack {
+                Text(verbatim: lang)
+                    .font(.system(size: 13, design: .monospaced))
+                    .fontWeight(.semibold)
+                Spacer()
                 Button {
                     Notifier.copy(code)
                     copied = true
                 } label: {
-                    HStack(spacing: 4) {
-                        EchoIcon(copied ? "checkmark" : "doc.on.doc", size: 15)
-                        Text(copied ? "已复制" : "复制").font(.caption)
-                    }
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .padding(7)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GrowingButton())
                 Menu {
                     Button("存为文件", systemImage: "square.and.arrow.down") {
-                        onSave(code, language)
+                        onSave(code, lang)
                     }
                     Button("分享", systemImage: "square.and.arrow.up") {
                         ShareHelper.share(items: [code])
                     }
                 } label: {
-                    EchoIcon("ellipsis", size: 15)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                    Image(systemName: "ellipsis").padding(7)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(GrowingButton())
             }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .frame(height: 40)
-            .background(Color.primary.opacity(0.04))
+            .padding(.horizontal)
+            .padding(.vertical, 4)
+            .background(Ench.secondaryBackground)
 
-            Divider().opacity(0.5)
+            Divider().overlay(Ench.divider)
 
-            Group {
-                if wrapped {
-                    Text(code)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        Text(code)
-                            .font(.system(.caption, design: .monospaced))
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .padding(12)
-                    }
-                }
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(code)
+                    .font(.system(size: Ench.body * 0.85, design: .monospaced))
+                    .lineSpacing(Ench.body * 0.225)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(16)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(uiColor: .secondarySystemBackground))
         }
-        .clipShape(RoundedRectangle(cornerRadius: EchoM.codeRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: EchoM.codeRadius, style: .continuous)
-                .stroke(.primary.opacity(0.07), lineWidth: 0.5)
-        )
+        .background(Ench.secondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .task(id: copied) {
             guard copied else { return }
             try? await Task.sleep(for: .seconds(2))

@@ -6,12 +6,14 @@ enum MD {
         var out = AttributedString()
         var i = 0
 
-        func add(_ str: String, _ f: Font, _ c: Color? = nil, _ link: URL? = nil) {
+        func add(_ str: String, _ f: Font, _ c: Color? = nil, _ link: URL? = nil,
+                 _ bg: Color? = nil) {
             guard !str.isEmpty else { return }
             var a = AttributeContainer()
             a.font = f
             if let c { a.foregroundColor = c }
             if let l = link { a.link = l }
+            if let bg { a.backgroundColor = bg }
             out.append(AttributedString(str, attributes: a))
         }
 
@@ -27,8 +29,8 @@ enum MD {
         while i < chars.count {
             let c = chars[i]
             if c == "`", let e = find(["`"], from: i + 1) {
-                add(String(chars[(i + 1)..<e]), .system(size: size - 1.5, design: .monospaced),
-                    Color(hex: "C0392B"))
+                add(String(chars[(i + 1)..<e]), .system(size: size * 0.85, design: .monospaced),
+                    Ench.text, nil, Ench.secondaryBackground)
                 i = e + 1
                 continue
             }
@@ -46,7 +48,7 @@ enum MD {
                chars[close + 1] == "(", let e = find([")"], from: close + 2) {
                 let label = String(chars[(i + 1)..<close])
                 let url = String(chars[(close + 2)..<e])
-                add(label, .system(size: size), Theme.accent, URL(string: url))
+                add(label, .system(size: size), Ench.link, URL(string: url))
                 i = e + 1
                 continue
             }
@@ -166,15 +168,16 @@ enum MDParse {
 
 struct MarkdownView: View {
     let text: String
-    var size: CGFloat = 16
+    var size: CGFloat = Ench.body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: size * 0.8) {
             ForEach(MDParse.blocks(text)) { block in
                 row(block)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .foregroundStyle(Ench.text)
         .textSelection(.enabled)
     }
 
@@ -182,48 +185,54 @@ struct MarkdownView: View {
     private func row(_ b: MDBlock) -> some View {
         switch b.kind {
         case .heading(let level):
-            let s = size * (level <= 1 ? 1.5 : level == 2 ? 1.25 : 1.08)
-            Text(MD.inline(b.lines.joined(separator: " "), size: s))
-                .font(.system(size: s, weight: .semibold))
-                .padding(.top, level <= 2 ? 8 : 4)
-                .fixedSize(horizontal: false, vertical: true)
+            let s = size * (level <= 1 ? 2 : level == 2 ? 1.5 : 1.25)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(MD.inline(b.lines.joined(separator: " "), size: s))
+                    .font(.system(size: s, weight: .semibold))
+                    .lineSpacing(s * 0.125)
+                    .padding(.bottom, s * 0.3)
+                if level <= 2 {
+                    Divider().overlay(Ench.divider)
+                }
+            }
+            .padding(.top, level <= 1 ? 24 : 16)
+            .padding(.bottom, level <= 1 ? 8 : 4)
+            .fixedSize(horizontal: false, vertical: true)
         case .para:
             Text(MD.inline(b.lines.joined(separator: "\n"), size: size))
-                .lineSpacing(4)
+                .lineSpacing(size * 0.25)
                 .fixedSize(horizontal: false, vertical: true)
         case .quote:
-            HStack(alignment: .top, spacing: size * 0.75) {
-                Capsule().fill(.primary.opacity(0.18)).frame(width: 3)
+            HStack(alignment: .top, spacing: 10) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Ench.border).frame(width: 3)
+                    .padding(.vertical, 2)
                 Text(MD.inline(b.lines.joined(separator: "\n"), size: size))
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(4)
+                    .foregroundStyle(Ench.secondaryText)
+                    .lineSpacing(size * 0.25)
             }
             .fixedSize(horizontal: false, vertical: true)
         case .bullet:
-            HStack(alignment: .firstTextBaseline, spacing: size * 0.4) {
-                Image(systemName: "circle.fill")
-                    .font(.system(size: size * 0.33))
-                    .frame(width: size, alignment: .leading)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 9) {
+                Text("•").font(.system(size: size)).foregroundStyle(Ench.secondaryText)
                 Text(MD.inline(b.lines.joined(separator: " "), size: size))
-                    .lineSpacing(4)
+                    .lineSpacing(size * 0.25)
                 Spacer(minLength: 0)
             }
             .fixedSize(horizontal: false, vertical: true)
         case .ordered(let n):
-            HStack(alignment: .firstTextBaseline, spacing: size * 0.4) {
+            HStack(alignment: .firstTextBaseline, spacing: 9) {
                 Text("\(n).")
-                    .font(.system(size: size, weight: .medium, design: .default))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: size, alignment: .leading)
+                    .font(.system(size: size, weight: .semibold))
+                    .foregroundStyle(Ench.secondaryText)
+                    .frame(width: 20, alignment: .leading)
                 Text(MD.inline(b.lines.joined(separator: " "), size: size))
-                    .lineSpacing(4)
+                    .lineSpacing(size * 0.25)
                 Spacer(minLength: 0)
             }
             .fixedSize(horizontal: false, vertical: true)
         case .rule:
-            Divider().padding(.vertical, 4)
+            Divider().overlay(Ench.divider).padding(.vertical, 6)
         case .table:
             MDTable(rows: b.lines, size: size)
         }
