@@ -1,0 +1,9 @@
+﻿build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+.DS_Store
+*.ipa
+check.js
+fix*.js
