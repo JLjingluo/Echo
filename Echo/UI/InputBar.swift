@@ -263,8 +263,7 @@ struct InputBar: View {
                 .foregroundStyle(Ink.gray)
             Button(action: approve) {
                 Text("执行")
-                    .font(Hand.body(14))
-                    .weight(.semibold)
+                    .font(Hand.body(14).weight(.semibold))
                     .foregroundStyle(Ink.accent)
                     .padding(.horizontal, 14)
                     .frame(height: 32)

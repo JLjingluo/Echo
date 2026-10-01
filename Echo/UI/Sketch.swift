@@ -135,41 +135,42 @@ struct Hatch: Shape {
 struct SketchBorder: ViewModifier {
     var seed: UInt64 = 1
     var corner: CGFloat = 14
+    var capsule = false
     var color: Color = Ink.line
     var width: CGFloat = Gutter.stroke
     var double = false
-    var capsule = false
     var gap: Int? = nil
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        content.overlay { lines }
-    }
-
-    @ViewBuilder private var lines: some View {
-        shape.stroke(color, style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
-        if double {
-            shape.offset(x: 1.4, y: -1.1)
-                .stroke(color.opacity(0.26),
-                        style: StrokeStyle(lineWidth: width * 0.75, lineCap: .round))
+        content.overlay {
+            strokeShape(offset: .zero, opacity: 1, scale: 1)
+            if double {
+                strokeShape(offset: CGSize(width: 1.4, height: -1.1), opacity: 0.26, scale: 0.75)
+            }
         }
     }
 
-    @ViewBuilder private var shape: some View {
+    @ViewBuilder
+    private func strokeShape(offset: CGSize, opacity: Double, scale: CGFloat) -> some View {
+        let style = StrokeStyle(lineWidth: width * scale, lineCap: .round, lineJoin: .round)
         if capsule {
             SketchCapsule(seed: seed, gap: gap)
+                .stroke(color.opacity(opacity), style: style)
+                .offset(offset)
         } else {
             SketchRect(seed: seed, corner: corner, gap: gap)
+                .stroke(color.opacity(opacity), style: style)
+                .offset(offset)
         }
     }
 }
 
 extension View {
-    func sketch(seed: UInt64 = 1, corner: CGFloat = 14, color: Color = Ink.line,
-                width: CGFloat = Gutter.stroke, double: Bool = false,
-                capsule: Bool = false, gap: Int? = nil) -> some View {
-        modifier(SketchBorder(seed: seed, corner: corner, color: color, width: width,
-                              double: double, capsule: capsule, gap: gap))
+    func sketch(seed: UInt64 = 1, corner: CGFloat = 14, capsule: Bool = false,
+                color: Color = Ink.line, width: CGFloat = Gutter.stroke,
+                double: Bool = false, gap: Int? = nil) -> some View {
+        modifier(SketchBorder(seed: seed, corner: corner, capsule: capsule, color: color,
+                              width: width, double: double, gap: gap))
     }
 
     var paperBackground: some View {

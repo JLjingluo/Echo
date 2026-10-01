@@ -166,8 +166,7 @@ struct SidebarView: View {
                     HStack(spacing: 8) {
                         HandIcon(glyph: .plus, size: 17, color: Ink.line, seed: 601)
                         Text("新对话")
-                            .font(Hand.body(16))
-                            .weight(.semibold)
+                            .font(Hand.body(16).weight(.semibold))
                             .foregroundStyle(Ink.line)
                         Spacer()
                     }
@@ -280,8 +279,7 @@ struct SidebarView: View {
                 HandIcon(glyph: .doc, size: 17, color: active ? Ink.accent : Ink.gray,
                          seed: 620)
                 Text(s.title.isEmpty ? "新会话" : s.title)
-                    .font(Hand.body(16))
-                    .weight(active ? .semibold : .regular)
+                    .font(Hand.body(16).weight(active ? .semibold : .regular))
                     .foregroundStyle(active ? Ink.line : Ink.gray)
                     .lineLimit(1)
                 Spacer(minLength: 6)
