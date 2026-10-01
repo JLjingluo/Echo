@@ -179,19 +179,30 @@ struct ChatView: View {
         let open = live || expandedGroups.contains(g.id)
         VStack(spacing: 0) {
             WorkGroupHeader(text: live ? "正在工作…" : g.label, chevronUp: open) {
-                guard !live else { return }
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    if open { expandedGroups.remove(g.id) } else { expandedGroups.insert(g.id) }
-                }
+                if !live { toggle(g.id) }
             }
             if open {
                 ForEach(g.items) { rowFor($0) }
-                WorkGroupHeader(text: "收起", chevronUp: true) {
-                    withAnimation(.easeInOut(duration: 0.18)) { expandedGroups.remove(g.id) }
+                if !live {
+                    WorkGroupHeader(text: "收起", chevronUp: true) {
+                        toggle(g.id)
+                    }
                 }
             }
         }
         .id(g.id)
+    }
+
+    private func toggle(_ id: String) {
+        var next = expandedGroups
+        if next.contains(id) {
+            next.remove(id)
+        } else {
+            next.insert(id)
+        }
+        withAnimation(.easeInOut(duration: 0.18)) {
+            expandedGroups = next
+        }
     }
 
     private func scrollTo(_ proxy: ScrollViewProxy) {
