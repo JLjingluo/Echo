@@ -172,9 +172,11 @@ final class AgentRuntime {
             let steps = try await makePlan(goal: text, history: history, settings: settings,
                                            service: service, toolNames: tools.map(\.name))
             plan = steps
-            append(RunItem(.plan, order: nextOrder(), title: "执行计划",
-                           status: live(steps.first?.status), steps: steps))
-            if !settings.autoApprove {
+            if steps.count > 1 {
+                append(RunItem(.plan, order: nextOrder(), title: "执行计划",
+                               status: live(steps.first?.status), steps: steps))
+            }
+            if steps.count > 1 && !settings.autoApprove {
                 pendingSteps = steps
                 phase = .awaiting
                 return
@@ -208,14 +210,17 @@ final class AgentRuntime {
                          context: ModelContext) async {
         phase = .executing
         var record: [String] = []
+        let showSteps = steps.count > 1
         for idx in steps.indices {
             if Task.isCancelled { break }
             var step = steps[idx]
             step.status = .running
             setStep(step, at: idx)
             let noteId = "note-\(step.id)"
-            append(RunItem(id: noteId, .text, order: nextOrder(),
-                           text: "▸ 第 \(idx + 1)/\(steps.count) 步：\(step.title)", status: .running))
+            if showSteps {
+                append(RunItem(id: noteId, .text, order: nextOrder(),
+                               text: "▸ 第 \(idx + 1)/\(steps.count) 步：\(step.title)", status: .running))
+            }
             do {
                 let outcome = try await runStep(step: step, index: idx, total: steps.count,
                                                 steps: steps, goal: goal, record: record,
@@ -236,8 +241,29 @@ final class AgentRuntime {
             }
         }
         if Task.isCancelled { finishCancel(session: session, context: context); return }
+        if steps.count == 1 {
+            finishDirect(session: session, context: context)
+            return
+        }
         await summarise(goal: goal, record: record, history: history, settings: settings,
                         service: service, session: session, context: context)
+    }
+
+    private func finishDirect(session: ChatSession, context: ModelContext) {
+        let hasText = items.contains {
+            $0.kind == .text && !$0.isReasoning && !$0.isStepHeader && !$0.text.trimmed.isEmpty
+        }
+        if !hasText {
+            let names = runFiles.map(\.name)
+            append(RunItem(.text, order: nextOrder(),
+                           text: names.isEmpty ? "（这一步没生成文字，看上面的执行结果）"
+                               : "已经做完，产出文件：" + names.joined(separator: "、"),
+                           status: .done))
+        }
+        usage.seconds = Date.now.timeIntervalSince(runStart)
+        phase = .done
+        Notifier.shared.runDone(title: "任务完成", body: goal.clamped(40))
+        persistAssistant(session: session, context: context)
     }
 
     private func runStep(step: StepState, index: Int, total: Int, steps: [StepState], goal: String,

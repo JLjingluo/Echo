@@ -65,8 +65,9 @@ struct UserCard: View {
                 }
                 MarkdownView(text: item.text)
             }
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 25).fill(.regularMaterial))
+            .padding(14)
+            .background(Ink.wash, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .sketch(seed: 61, corner: 18)
         }
     }
 }
@@ -89,7 +90,7 @@ struct TextBody: View {
             ReasonRow(text: item.text, live: item.status == .running,
                       seconds: max(0, item.endedAt.timeIntervalSince(item.startedAt)))
         } else if item.isStepHeader {
-            MarkerRow(title: String(item.text.dropFirst(2)), symbol: "arrow.right.circle",
+            MarkerRow(title: String(item.text.dropFirst(2)), symbol: "list.number",
                       live: item.status == .running)
         } else {
             HStack(alignment: .firstTextBaseline, spacing: 0) {

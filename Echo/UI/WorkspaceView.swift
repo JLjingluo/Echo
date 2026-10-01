@@ -249,7 +249,7 @@ struct FilePreviewView: View {
                     Text(note)
                         .font(.system(size: 13))
                         .padding(.horizontal, 14).padding(.vertical, 8)
-                        .glass(.capsule)
+                        .sketch(seed: 6, capsule: true, color: Ink.gray)
                         .padding(.bottom, 6)
                 }
             }

@@ -121,7 +121,6 @@ struct ChatRequest: Sendable {
                                                   "parameters": t.parameters]]
             }
             body["tool_choice"] = "auto"
-            body["parallel_tool_calls"] = true
         }
         if m.contains("deepseek") && !m.contains("reasoner") {
             if thinking { body["thinking"] = ["type": "enabled"] }

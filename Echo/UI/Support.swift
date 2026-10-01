@@ -41,20 +41,19 @@ extension Color {
 }
 
 enum Ench {
-    static let text = Color(light: Color(rgba: 0x0606_06ff), dark: Color(rgba: 0xfbfb_fcff))
-    static let secondaryText = Color(light: Color(rgba: 0x6b6e_7bff), dark: Color(rgba: 0x9294_a0ff))
-    static let tertiaryText = Color(light: Color(rgba: 0x6b6e_7bff), dark: Color(rgba: 0x6d70_7dff))
-    static let background = Color(light: .white, dark: Color(rgba: 0x1819_1dff))
-    static let secondaryBackground = Color(light: Color(rgba: 0xf7f7_f9ff), dark: Color(rgba: 0x2526_2aff))
-    static let link = Color(light: Color(rgba: 0x2c65_cfff), dark: Color(rgba: 0x4c8e_f8ff))
-    static let border = Color(light: Color(rgba: 0xe4e4_e8ff), dark: Color(rgba: 0x4244_4eff))
-    static let divider = Color(light: Color(rgba: 0xd0d0_d3ff), dark: Color(rgba: 0x3334_38ff))
-    static let cardFill = Color(light: Color(rgba: 0xf7f7_f9ff), dark: Color(rgba: 0x2526_2aff))
-    static let cardStroke = Color(light: Color(rgba: 0xe4e4_e8ff), dark: Color(rgba: 0x4244_4eff)).opacity(0.35)
-    static let brand = [Color(hex: "4285f4"), Color(hex: "9b72cb"),
-                        Color(hex: "d96570"), Color(hex: "d96570")]
+    static var text: Color { Ink.line }
+    static var secondaryText: Color { Ink.gray }
+    static var tertiaryText: Color { Ink.faint }
+    static var background: Color { Ink.paper }
+    static var secondaryBackground: Color { Ink.wash }
+    static var link: Color { Ink.accent }
+    static var border: Color { Ink.faint }
+    static var divider: Color { Ink.faint.opacity(0.55) }
+    static var cardFill: Color { Ink.paper }
+    static var cardStroke: Color { Ink.line }
+    static var brand: [Color] { [Ink.line] }
     static var brandGradient: LinearGradient {
-        LinearGradient(colors: brand, startPoint: .leading, endPoint: .trailing)
+        LinearGradient(colors: [Ink.line, Ink.line], startPoint: .leading, endPoint: .trailing)
     }
     static let body = CGFloat(16)
 }
@@ -206,9 +205,9 @@ struct CodeBlock: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 4)
-            .background(Ench.secondaryBackground)
+            .background(Ink.line.opacity(0.06))
 
-            Divider().overlay(Ench.divider)
+            Divider().overlay(Ink.line.opacity(0.25))
 
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(code)
@@ -219,8 +218,9 @@ struct CodeBlock: View {
                     .padding(16)
             }
         }
-        .background(Ench.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(Ink.wash)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .sketch(seed: 17, corner: 10)
         .task(id: copied) {
             guard copied else { return }
             try? await Task.sleep(for: .seconds(2))

@@ -73,7 +73,7 @@ struct ChatView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 13))
-                    Text("数据库打不开，这次的内容关掉就没了。重装 App 可恢复。")
+                    Text("数据库打不开，已切到内存模式：这次的记录关掉就没了。")
                         .font(.system(size: 13))
                     Spacer()
                 }
@@ -84,7 +84,7 @@ struct ChatView: View {
             if !reach.online {
                 HStack(spacing: 8) {
                     Image(systemName: "wifi.slash").font(.system(size: 13))
-                    Text("没网。发出去的任务会等着，联网后重试。")
+                    Text("没网，这次任务会失败。联网后长按你那条消息选「重新生成」。")
                         .font(.system(size: 13))
                     Spacer()
                 }
@@ -94,7 +94,8 @@ struct ChatView: View {
             }
             header.padding(.horizontal)
             if timeline.isEmpty {
-                EmptyState(sendPrompt: { send(goal: $0, images: [], truncating: nil) })
+                EmptyState(sendPrompt: { send(goal: $0, images: [], truncating: nil) },
+                           openModel: { showModel = true })
             } else {
                 timelineScroll
             }
@@ -122,45 +123,63 @@ struct ChatView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
+        HStack(spacing: 8) {
             Button(action: onMenu) {
-                Image(systemName: "line.3.horizontal")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 22)
-                    .foregroundColor(Color(.label))
+                HandIcon(glyph: .menu, size: 22, color: Ink.line, seed: 501)
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        SketchCircle(seed: 502).stroke(Ink.line,
+                            style: StrokeStyle(lineWidth: 1.7, lineCap: .round))
+                    }
+                    .contentShape(Circle())
             }
-            .buttonStyle(GrowingButton())
+            .buttonStyle(.plain)
+            .accessibilityLabel("打开侧栏")
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            ModelSelectorView(selected: app.settings.model, version: app.vendorName,
-                              models: []) { showModel = true }
+            HStack(spacing: 0) {
+                Button { showModel = true } label: {
+                    HStack(spacing: 5) {
+                        Text(app.settings.model.isEmpty ? "选模型" : app.settings.model)
+                            .font(Hand.mono(12))
+                            .foregroundStyle(Ink.gray)
+                            .lineLimit(1)
+                        HandIcon(glyph: .chevron, size: 10, color: Ink.faint, seed: 505)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(height: 46)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("厂商与模型")
 
-            Spacer()
+                SketchRect(seed: 506, corner: 1)
+                    .stroke(Ink.faint, lineWidth: 1.1)
+                    .frame(width: 1.2, height: 18)
 
-            Button { showWorkspace = true } label: {
-                Image(systemName: "folder")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 21)
-                    .foregroundColor(Color(.label))
+                Button { showWorkspace = true } label: {
+                    HandIcon(glyph: .folder, size: 20, color: Ink.line, seed: 507)
+                        .frame(width: 42, height: 46)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("工作区文件")
+
+                Button(action: onNew) {
+                    HandIcon(glyph: .plus, size: 20, color: Ink.line, seed: 508)
+                        .frame(width: 42, height: 46)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("新会话")
             }
-            .buttonStyle(GrowingButton())
-
-            Button(action: onNew) {
-                Image(systemName: "square.and.pencil")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 22)
-                    .foregroundColor(Color(.label))
-            }
-            .buttonStyle(GrowingButton())
+            .frame(height: 48)
+            .sketch(seed: 509, capsule: true, double: true)
         }
-        .frame(height: 44)
+        .frame(height: 52)
+        .padding(.horizontal, Gutter.edge - 10)
+        .padding(.top, Device.topInset)
     }
 
     private var timelineScroll: some View {

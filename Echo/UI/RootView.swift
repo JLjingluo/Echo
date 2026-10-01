@@ -4,37 +4,40 @@ import SwiftData
 struct RootView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
-    @Environment(\.colorScheme) private var scheme
     @Query(sort: \ChatSession.updatedAt, order: .reverse) private var sessions: [ChatSession]
     @State private var current: ChatSession?
     @State private var progress: CGFloat = 0
     @State private var open = false
 
+    private let fraction: CGFloat = 0.85
+
     var body: some View {
         GeometryReader { geo in
-            let w = max(geo.size.width * EchoM.drawerFraction, 1)
+            let w = max(geo.size.width * fraction, 1)
             ZStack(alignment: .leading) {
-                Ench.background.ignoresSafeArea()
+                Ink.paper.ignoresSafeArea()
 
                 SidebarView(current: $current, progress: $progress, open: $open,
-                            sessions: sessions, reveal: w, insets: geo.safeAreaInsets)
+                            sessions: sessions, reveal: w)
                     .frame(width: w)
                     .frame(maxHeight: .infinity, alignment: .leading)
-                    .background(Ench.background)
-                    .scaleEffect(EchoM.closedScale + (1 - EchoM.closedScale) * progress,
-                                 anchor: .leading)
-                    .overlay {
-                        Ench.background
-                            .opacity(EchoM.sidebarVeil * (1 - min(max(progress, 0), 1)))
-                    }
+                    .background(Ink.paper)
+                    .scaleEffect(0.96 + 0.04 * progress, anchor: .leading)
                     .allowsHitTesting(progress > 0.001)
 
                 detail(reveal: w)
 
+                if progress > 0.001 {
+                    Hatch(spacing: 9, inset: 0)
+                        .stroke(Ink.line.opacity(0.07 * Double(progress)), lineWidth: 1)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
                 if progress <= 0.001 {
                     HStack {
                         Color.clear
-                            .frame(width: EchoM.edgeActivation)
+                            .frame(width: 44)
                             .contentShape(Rectangle())
                             .gesture(edgeDrag(w))
                         Spacer()
@@ -50,7 +53,7 @@ struct RootView: View {
 
     @ViewBuilder
     private func detail(reveal: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: progress > 0.001 ? 30 : 0, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: progress > 0.001 ? 26 : 0, style: .continuous)
         Group {
             if let s = current {
                 ChatView(session: s,
@@ -63,11 +66,13 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Ench.background)
+        .background(Ink.paper)
         .clipShape(shape)
-        .overlay { shape.strokeBorder(Color.primary.opacity(0.2 * progress), lineWidth: 1) }
-        .overlay { Color.white.opacity(EchoM.contentScrim * progress) }
-        .shadow(color: .black.opacity(0.28 * progress), radius: 18, x: -3, y: 0)
+        .overlay {
+            if progress > 0.001 {
+                shape.stroke(Ink.line.opacity(0.5 * progress), lineWidth: 1.6)
+            }
+        }
         .offset(x: reveal * progress)
         .overlay {
             if progress > 0.001 {
@@ -137,7 +142,6 @@ struct SidebarView: View {
     @Binding var open: Bool
     let sessions: [ChatSession]
     let reveal: CGFloat
-    let insets: EdgeInsets
     @State private var showSettings = false
     @State private var renaming: ChatSession?
     @State private var draft = ""
@@ -150,82 +154,89 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button(action: newConversation) {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 16))
-                    Text("新会话").font(.system(size: 16, weight: .medium))
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Text("Echo")
+                        .font(Hand.display(26))
+                        .foregroundStyle(Ink.line)
                     Spacer()
+                    BrandFace(size: 34, seed: 1234)
                 }
-                .foregroundStyle(Color(.label))
-                .padding(.horizontal, 14)
-                .frame(height: 40)
-                .contentShape(Rectangle())
+                Button(action: newConversation) {
+                    HStack(spacing: 8) {
+                        HandIcon(glyph: .plus, size: 17, color: Ink.line, seed: 601)
+                        Text("新对话")
+                            .font(Hand.body(16))
+                            .weight(.semibold)
+                            .foregroundStyle(Ink.line)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .sketch(seed: 602, capsule: true, double: true)
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(GrowingButton())
-            .padding(.horizontal, 10)
-            .padding(.top, 8)
+            .padding(.horizontal, Gutter.edge)
+            .padding(.top, Device.topInset + 14)
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 17) {
+                VStack(alignment: .leading, spacing: 22) {
                     ForEach(groups, id: \.date) { g in
                         VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text(g.date.daysAgoString())
-                                    .font(.system(size: 14))
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(Color(.systemGray))
-                                Spacer()
-                            }
-                            .contextMenu {
-                                Button(role: .destructive, action: { deleteDay(g) }) {
-                                    Label("删除当天全部会话", systemImage: "trash")
+                            Text(g.date.daysAgoString())
+                                .font(Hand.pencil(18))
+                                .foregroundStyle(Ink.faint)
+                                .padding(.bottom, 2)
+                                .contextMenu {
+                                    Button(role: .destructive, action: { deleteDay(g) }) {
+                                        Label("删除当天全部会话", systemImage: "trash")
+                                    }
                                 }
-                            }
-
                             ForEach(g.items) { s in row(s) }
-
-                            Divider()
                         }
                     }
-
                     if sessions.isEmpty {
                         Text("还没有会话")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(.systemGray))
+                            .font(Hand.body(14))
+                            .foregroundStyle(Ink.faint)
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 14)
-                .padding(.bottom, insets.bottom + 40)
+                .padding(.horizontal, Gutter.edge)
+                .padding(.top, 18)
+                .padding(.bottom, Device.bottomInset + 96)
             }
-            .scrollIndicators(.hidden)
             .contentShape(Rectangle())
             .gesture(dismissDrag)
 
             HStack(spacing: 10) {
-                Text("Echo")
-                    .font(.system(size: 22, weight: .thin))
-                    .foregroundStyle(Ench.brandGradient)
+                BrandFace(size: 30, seed: 777)
+                Text("本机")
+                    .font(Hand.body(15))
+                    .foregroundStyle(Ink.gray)
                 Spacer()
-                Text(AppVersion.text)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Ench.tertiaryText)
-                    .padding(.trailing, 4)
                 Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color(.label))
-                        .frame(width: 40, height: 40)
+                    HandIcon(glyph: .gear, size: 20, color: Ink.line, seed: 611)
+                        .frame(width: 44, height: 44)
+                        .overlay(SketchCircle(seed: 612).stroke(Ink.line, lineWidth: 1.6))
                         .contentShape(Circle())
                 }
-                .buttonStyle(GrowingButton())
+                .buttonStyle(.plain)
                 .accessibilityLabel("设置")
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, max(insets.bottom, 12))
+            .padding(.horizontal, Gutter.edge)
+            .padding(.bottom, Device.bottomInset + 14)
         }
         .frame(maxHeight: .infinity, alignment: .top)
+        .overlay(alignment: .trailing) {
+            VStack(spacing: 3) {
+                Rectangle().fill(Ink.line.opacity(0.85)).frame(width: 1.6)
+                Rectangle().fill(Ink.line.opacity(0.3)).frame(width: 1)
+            }
+            .frame(maxHeight: .infinity)
+            .padding(.vertical, 4)
+        }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .alert("重命名会话", isPresented: Binding(
             get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
@@ -258,32 +269,39 @@ struct SidebarView: View {
     }
 
     private func row(_ s: ChatSession) -> some View {
-        Button {
+        let active = current?.id == s.id
+        return Button {
             app.runtime.persistIfNeeded(session: s, context: context)
             current = s
             withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) { progress = 0 }
             open = false
         } label: {
-            HStack(spacing: 8) {
-                Circle()
-                    .frame(width: 6, height: 6)
-                    .animation(.easeOut(duration: 0.15))
-                    .transition(.opacity)
-                    .showIf(current?.id == s.id)
+            HStack(spacing: 10) {
+                HandIcon(glyph: .doc, size: 17, color: active ? Ink.accent : Ink.gray,
+                         seed: 620)
                 Text(s.title.isEmpty ? "新会话" : s.title)
+                    .font(Hand.body(16))
+                    .weight(active ? .semibold : .regular)
+                    .foregroundStyle(active ? Ink.line : Ink.gray)
                     .lineLimit(1)
-                    .font(.system(size: 16))
-                    .foregroundColor(Color(.label))
-                    .animation(.easeOut(duration: 0.15))
+                Spacer(minLength: 6)
                 if app.runtime.sessionId == s.id && app.runtime.needsApproval {
-                    StatusDot(color: .orange, pulsing: true)
+                    Circle().fill(Ink.accent).frame(width: 7, height: 7)
                 } else if app.runtime.sessionId == s.id && app.runtime.isBusy {
-                    StatusDot(color: .green, pulsing: true)
+                    RedrawSpinner(size: 15)
+                } else if active {
+                    Circle().fill(Ink.line).frame(width: 5, height: 5)
                 }
-                Spacer()
             }
-            .animation(.easeOut(duration: 0.15))
-            .padding(.vertical, 4)
+            .frame(height: 50)
+            .padding(.horizontal, active ? 8 : 0)
+            .overlay {
+                if active {
+                    SketchRect(seed: 621, corner: 14, wobble: 1.6)
+                        .stroke(Ink.accent, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+                        .offset(x: -6)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -315,5 +333,28 @@ struct SidebarView: View {
         current = s
         withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) { progress = 0 }
         open = false
+    }
+}
+
+struct RedrawSpinner: View {
+    var size: CGFloat = 16
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var turn: Double = 0
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate
+            let phase = reduceMotion ? 0.35 : (t.truncatingRemainder(dividingBy: 1.6)) / 1.6
+            Canvas { ctx, sz in
+                let box = CGRect(origin: .zero, size: sz).insetBy(dx: 1.5, dy: 1.5)
+                let base = Path(ellipseIn: box)
+                let arc = base.trimmedPath(from: 0, to: 0.28 + 0.5 * phase)
+                ctx.stroke(arc, with: .color(Ink.line.opacity(0.8)),
+                           style: StrokeStyle(lineWidth: 1.7, lineCap: .round))
+            }
+            .frame(width: size, height: size)
+        }
+        .onAppear { _ = turn }
+        .accessibilityHidden(true)
     }
 }

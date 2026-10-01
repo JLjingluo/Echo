@@ -67,7 +67,7 @@ struct SettingsView: View {
             Text(note)
                 .font(.system(size: 13))
                 .padding(.horizontal, 14).padding(.vertical, 8)
-                .glass(.capsule)
+                .sketch(seed: 5, capsule: true, color: Ink.gray)
                 .padding(.bottom, 6)
         }
     }
@@ -202,7 +202,7 @@ struct SettingsView: View {
     @ViewBuilder private var dataSection: some View {
         Section("数据") {
             if EchoState.storeDegraded {
-                Label("数据库打不开，本次会话只存在内存里，关掉就没了。重装 App 可以恢复。",
+                Label("数据库打不开，已切到内存模式：这次的记录关掉就没了。删掉 App 重装可以恢复可用状态（旧记录找不回来）。",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 12.5))
                     .foregroundStyle(.red)

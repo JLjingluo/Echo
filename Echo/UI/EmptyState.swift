@@ -49,6 +49,9 @@ let echoSuggestions: [Suggestion] = [
 enum EchoWheel {
     private static let bagKey = "echo.wheel.bag"
     private static let prevKey = "echo.wheel.prev"
+    private static let greetKey = "echo.wheel.greet"
+    private static let greets = ["今天想做点什么？", "从一个任务开始。", "说吧，我在听。",
+                                 "想先搞定哪件事？"]
 
     static func picks(_ count: Int = 4) -> [Suggestion] {
         let d = UserDefaults.standard
@@ -69,93 +72,62 @@ enum EchoWheel {
         d.set(ids, forKey: prevKey)
         return ids.map { echoSuggestions[$0] }
     }
+
+    static func greeting() -> String {
+        let d = UserDefaults.standard
+        let i = d.integer(forKey: greetKey) % greets.count
+        d.set((i + 1) % greets.count, forKey: greetKey)
+        return greets[i]
+    }
 }
 
 struct EmptyState: View {
     @Environment(AppState.self) private var app
     var sendPrompt: (String) -> Void
+    var openModel: () -> Void = {}
 
-    @State private var prompts: [Suggestion] = []
-    @State private var visibleItems = Set<Int>()
-    @State private var isKeyboardVisible = false
-
-    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    @State private var greeting = ""
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             Spacer()
-            VStack(spacing: 25) {
-                VStack(spacing: 6) {
-                    Text("Echo")
-                        .font(.system(size: 46, weight: .thin))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(Ench.brandGradient)
-                    Text(app.apiKey.isEmpty
-                         ? "还没填 \(app.vendorName) 的 Key"
-                         : "\(app.vendorName) · \(app.settings.model)")
-                        .font(.system(size: Ench.body))
-                        .foregroundStyle(Ench.secondaryText)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
 
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 15) {
-                    ForEach(0..<prompts.count, id: \.self) { index in
-                        card(prompts[index], index: index)
+            VStack(alignment: .leading, spacing: 14) {
+                BrandFace(size: 76)
+                    .padding(.bottom, 6)
+
+                Text(greeting)
+                    .font(Hand.display(36))
+                    .foregroundStyle(Ink.line)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("你的文件、记录、Key 都留在这台手机上。")
+                    .font(Hand.body(16))
+                    .foregroundStyle(Ink.gray)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button(action: openModel) {
+                    HStack(spacing: 6) {
+                        Text(app.apiKey.isEmpty ? "\(app.vendorName) · 还没填 Key" : app.vendorName)
+                            .font(Hand.body(14))
+                            .foregroundStyle(app.apiKey.isEmpty ? Ink.accent : Ink.gray)
+                        TechLabel(text: app.settings.model.isEmpty ? "选择模型" : app.settings.model)
                     }
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: 700)
-                .padding()
-                .transition(.opacity.combined(with: .slide))
-                .showIf(!isKeyboardVisible)
+                .buttonStyle(.plain)
+                .padding(.top, 10)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Gutter.edge)
+
+            Spacer()
             Spacer()
         }
-        .onAppear {
-            prompts = EchoWheel.picks()
-            for index in 0..<prompts.count {
-                DispatchQueue.main.async { visibleItems.insert(index) }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(
-            for: UIResponder.keyboardWillChangeFrameNotification)) { note in
-            let end = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect) ?? .zero
-            isKeyboardVisible = end.height > 0
-        }
-    }
-
-    private func card(_ s: Suggestion, index: Int) -> some View {
-        Button {
-            sendPrompt(s.text)
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(s.text)
-                    .font(.system(size: 16))
-                    .foregroundStyle(Ench.text)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 8)
-                HStack {
-                    Spacer()
-                    Image(systemName: s.icon)
-                        .imageScale(.medium)
-                        .foregroundStyle(Color.secondary)
-                        .accessibilityHidden(true)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 104, alignment: .leading)
-            .padding(15)
-            .background(Color.gray5Custom, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.gray4Custom.opacity(0.35), lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        .opacity(visibleItems.contains(index) ? 1 : 0)
-        .animation(.easeOut(duration: 0.3).delay(0.2 * Double(index)), value: visibleItems)
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(s.text))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Ink.paper)
+        .onAppear { greeting = EchoWheel.greeting() }
     }
 }
 
