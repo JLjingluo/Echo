@@ -74,7 +74,11 @@ struct AppSettings: Codable, Equatable {
     1. 需要用工具时只发工具调用，不要假装已经执行过。
     2. 产出文件一律用 write_file，文件名带正确扩展名，路径用相对文件名。
     3. 用户要多个文件就多次调用，不要合并成一个大文件除非内容本来是一体的。
-    4. 回答用中文，简洁，代码给完整可运行版本。
+    4. 只要你的回答里包含一个完整可用的文件（HTML 页面、JS/TS 脚本、CSS、JSON、Markdown、SVG、CSV、Python、Shell 等），
+       就必须先调用 write_file 把它真正写进工作区，正文里只说结论和文件名，不要把整段代码再贴一遍。
+       只有用户明确要「看代码」或代码片段不足一个文件时才贴在正文里。
+    5. 正文里贴代码时，代码块的围栏必须标语言，文件名写在围栏上，例如 ```html index.html。
+    6. 回答用中文，简洁，代码给完整可运行版本。
     """
 
     init() {}
@@ -119,14 +123,14 @@ struct AppSettings: Codable, Equatable {
             || m.contains("gpt-4.1") || m.contains("gpt-5") || m.contains("qwen3.5")
     }
 
-    var modelIsReasoningOnly: Bool {
+    var modelIsReasoning: Bool {
         if let t = vendor?.thinkingModels, t.contains(model) { return true }
         let m = model.lowercased()
         return m.contains("reasoner") || m.contains("qwq") || m.hasPrefix("o1") || m.hasPrefix("o3")
     }
 
     var modelSupportsTools: Bool {
-        !modelIsReasoningOnly
+        !enabledTools.isEmpty && !NoToolMemory.contains(model)
     }
 
     var trimmedBaseURL: String {

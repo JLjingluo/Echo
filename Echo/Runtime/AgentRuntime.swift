@@ -136,13 +136,8 @@ final class AgentRuntime {
                          context: ModelContext) async {
         do {
             phase = .planning
-            let steps: [StepState]
-            if settings.provider == .openai && settings.modelIsReasoningOnly {
-                steps = [StepState(id: 1, title: "直接回答", detail: "推理模型不支持工具，直接作答")]
-            } else {
-                steps = try await makePlan(goal: text, history: history, settings: settings,
+            let steps = try await makePlan(goal: text, history: history, settings: settings,
                                            service: service, toolNames: tools.map(\.name))
-            }
             plan = steps
             append(RunItem(.plan, order: nextOrder(), title: "执行计划",
                            status: live(steps.first?.status), steps: steps))
@@ -229,7 +224,17 @@ final class AgentRuntime {
         for turn in 0..<settings.maxTurnsPerStep {
             if Task.isCancelled { throw ChatError.cancelled }
             req.messages = msgs
-            let collected = try await collect(req: req, service: service)
+            let collected: Collected
+            do {
+                collected = try await collect(req: req, service: service)
+            } catch {
+                guard !req.tools.isEmpty, Self.isToolRejection(error) else { throw error }
+                NoToolMemory.remember(settings.model)
+                req.tools = []
+                append(RunItem(.note, order: nextOrder(),
+                               text: "\(settings.model) 这个接口不接受工具调用，已改为直接作答", status: .done))
+                collected = try await collect(req: req, service: service)
+            }
             let spoken = collected.text
             if collected.calls.isEmpty {
                 let tail = produced.isEmpty ? "" : "｜产出 " + produced.joined(separator: "，")
@@ -378,12 +383,35 @@ final class AgentRuntime {
             let collected = try await collect(req: req, service: service)
             let body = collected.text.isEmpty ? "（这一步没生成文字，看上面的执行结果）" : collected.text
             append(RunItem(id: "final", .text, order: nextOrder(), text: body, status: .done))
+            saveCodeFiles(from: body, hint: goal)
             usage.seconds = Date.now.timeIntervalSince(runStart)
             phase = .done
             Notifier.shared.runDone(title: "任务完成", body: goal.clamped(40))
             persistAssistant(session: session, context: context)
         } catch {
             fail(error, session: session, context: context)
+        }
+    }
+
+    static func isToolRejection(_ e: Error) -> Bool {
+        guard case let ChatError.http(code, body) = e as? ChatError, (400...499).contains(code) else {
+            return false
+        }
+        let b = body.lowercased()
+        return b.contains("tool") || b.contains("function") || b.contains("工具") || b.contains("不支持")
+    }
+
+    private func saveCodeFiles(from text: String, hint: String) {
+        let skip = Set(items.compactMap { $0.file?.name })
+        for c in CodeFiles.candidates(from: text, hint: hint, skip: skip) {
+            guard let url = try? FileStore.shared.write(c.name, c.content) else { continue }
+            let bytes = (try? Data(contentsOf: url))?.count ?? c.content.utf8.count
+            let head = c.content.components(separatedBy: "\n").prefix(3).joined(separator: " ")
+            append(RunItem(.file, order: nextOrder(), text: head.clamped(120), title: c.name,
+                           status: .done, path: url.path,
+                           file: RunFile(name: c.name, path: url.path, size: bytes,
+                                         preview: head.clamped(120),
+                                         added: c.lineCount, removed: 0)))
         }
     }
 

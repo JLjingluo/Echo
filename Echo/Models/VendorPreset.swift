@@ -19,7 +19,7 @@ let vendorPresets: [VendorPreset] = [
         models: ["deepseek-chat", "deepseek-reasoner"],
         thinkingModels: ["deepseek-reasoner"],
         keyURL: "https://platform.deepseek.com/api_keys",
-        note: "reasoner 不支持工具调用，Agent 模式请用 deepseek-chat"),
+        note: "deepseek-chat 和 deepseek-reasoner 都能调工具，Agent 模式随便选"),
     VendorPreset(
         id: "openai", name: "OpenAI / ChatGPT", provider: .openai,
         baseURL: "https://api.openai.com/v1",
@@ -38,7 +38,7 @@ let vendorPresets: [VendorPreset] = [
         id: "qwen", name: "通义千问 (阿里云百炼)", provider: .openai,
         baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
         models: ["qwen-plus", "qwen-turbo", "qwen-max", "qwen3-max", "qwen-vl-max"],
-        thinkingModels: ["qwen3-max", "qwen-plus"],
+        thinkingModels: ["qwq-plus", "qwen3-max-preview"],
         visionModels: ["qwen-vl-max", "qwen-vl-plus"],
         keyURL: "https://bailian.console.aliyun.com/#/api-key",
         note: "国际区把 baseURL 换成 https://dashscope-intl.aliyuncs.com/compatible-mode/v1"),

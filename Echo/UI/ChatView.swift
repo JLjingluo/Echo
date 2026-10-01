@@ -1,22 +1,28 @@
 import SwiftUI
 import SwiftData
 
+private struct TailFrameKey: PreferenceKey {
+    static var defaultValue: CGFloat = .greatestFiniteMagnitude
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
 struct ChatView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
+    @Environment(\.colorScheme) private var scheme
     @Bindable var session: ChatSession
     var onMenu: () -> Void
 
     @State private var draft = ""
     @State private var showWorkspace = false
     @State private var showSettings = false
-    @State private var showDetails = false
+    @State private var showModel = false
     @State private var speaking = false
-    @State private var renaming = false
-    @State private var newName = ""
     @State private var previewFile: RunFile?
     @State private var exportURLs: [URL] = []
     @State private var atBottom = true
+    @State private var scrollTick = 0
+    @State private var showDetails = false
 
     private var runtime: AgentRuntime { app.runtime }
 
@@ -46,17 +52,49 @@ struct ChatView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            if timeline.isEmpty {
-                EmptyState(onPick: { draft = $0 }, openModel: { showSettings = true })
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                timelineScroll
+        NavigationStack {
+            GeometryReader { geo in
+                ZStack(alignment: .bottom) {
+                    EchoTheme.background(scheme)
+                    if timeline.isEmpty {
+                        EmptyState(onPick: { draft = $0 },
+                                   openModel: { showModel = true })
+                    } else {
+                        timelineScroll(viewport: geo.size.height)
+                    }
+                    if !atBottom && !timeline.isEmpty {
+                        Button { scrollTick += 1 } label: {
+                            HStack(spacing: 5) {
+                                EchoIcon("arrow.down", size: 13)
+                                Text("到底部")
+                            }
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .glass(.capsule, interactive: true)
+                            .frame(minHeight: EchoM.touch)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.bottom, 2)
+                    }
+                }
             }
-            InputBar(text: $draft, session: session, onOpenSettings: { showSettings = true })
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(session.title.isEmpty ? "新会话" : session.title)
+            .navigationSubtitle(" ")
+            .toolbarBackground(EchoTheme.background(scheme), for: .navigationBar)
+            .tint(EchoTheme.controlFill(scheme))
+            .toolbar { bar }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                InputBar(text: $draft, session: session,
+                         onOpenSettings: { showSettings = true })
+                    .frame(maxWidth: EchoM.maxContentWidth)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .background(Color(.systemBackground))
+        .background(EchoTheme.background(scheme))
         .onAppear { runtime.persistIfNeeded(session: session, context: context) }
         .onChange(of: runtime.phase) { _, newPhase in
             guard newPhase == .done, app.settings.autoExport else { return }
@@ -66,97 +104,120 @@ struct ChatView: View {
         }
         .sheet(isPresented: $showWorkspace) { WorkspaceView() }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showModel) { ModelPickerSheet() }
         .sheet(item: $previewFile) { FilePreviewView(file: $0) }
-        .alert("重命名会话", isPresented: $renaming) {
-            TextField("标题", text: $newName)
-            Button("好") { session.title = newName; try? context.save() }
-            Button("取消", role: .cancel) {}
-        }
         .modifier(ExportModifier(urls: $exportURLs))
     }
 
-    private var timelineScroll: some View {
-            ScrollViewReader { proxy in
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        ForEach(timeline) { item in
-                            ItemRow(item: item, onSaveCode: saveCode, onOpenFile: { previewFile = $0 })
-                                .id(item.id)
-                                .transition(.opacity)
-                        }
-                        statusLine
-                        runFooter
-                        Color.clear.frame(height: 8).id("bottom")
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 8)
-                }
-                .scrollDismissesKeyboard(.interactively)
-                .onChange(of: timeline.count) { _, _ in
-                    if atBottom { withAnimation(.linear(duration: 0.18)) { proxy.scrollTo("bottom", anchor: .bottom) } }
-                }
-                .onChange(of: timeline.last?.text.count ?? 0) { _, _ in
-                    if atBottom { proxy.scrollTo("bottom", anchor: .bottom) }
-                }
+    @ToolbarContentBuilder
+    private var bar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button(action: onMenu) {
+                EchoIcon("sidebar.left", size: 19)
             }
-    }
-
-    private var header: some View {
-        HStack(spacing: 10) {
-            GlassIconButton(system: "line.3.horizontal", hint: "会话列表", action: onMenu)
-            Spacer(minLength: 8)
+            .accessibilityLabel("打开侧栏")
+        }
+        ToolbarItem(placement: .principal) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(session.title.isEmpty ? "新会话" : session.title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                Button { showModel = true } label: {
+                    HStack(spacing: 4) {
+                        EchoIcon("sparkles", size: 11)
+                        Text("\(app.vendorName) · \(app.settings.model)")
+                            .font(.caption)
+                            .lineLimit(1)
+                        EchoIcon("chevron.down", size: 10, weight: .semibold)
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(height: 16)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("厂商与模型")
+            }
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            Button { showWorkspace = true } label: { EchoIcon("folder", size: 19) }
+                .accessibilityLabel("工作区文件")
             Menu {
-                Button { showSettings = true } label: { Label("厂商与模型", systemImage: "sparkles") }
+                Button { showModel = true } label: { Label("厂商与模型", systemImage: "sparkles") }
                 Button { showWorkspace = true } label: { Label("工作区文件", systemImage: "folder") }
-                Button { newName = session.title; renaming = true } label: { Label("重命名会话", systemImage: "pencil") }
                 Button { exportAll() } label: { Label("导出全部文件到「文件」", systemImage: "square.and.arrow.up") }
                 Button { clearLive() } label: { Label("清空执行过程", systemImage: "eraser") }
                 Divider()
                 Button(role: .destructive) { deleteSession() } label: { Label("删除会话", systemImage: "trash") }
             } label: {
-                HStack(spacing: 6) {
-                    Text("Echo")
-                        .font(.system(size: 14.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.primary)
-                    Text("·")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.tertiary)
-                    Text(app.vendorName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .glass(.capsule)
-                .contentShape(Capsule())
+                EchoIcon("ellipsis", size: 19)
             }
-            .menuIndicator(.hidden)
-            .fixedSize()
+            .accessibilityLabel("会话菜单")
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
+    }
+
+    private func timelineScroll(viewport: CGFloat) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: EchoM.timelineSpacing) {
+                    ForEach(timeline) { item in
+                        ItemRow(item: item, onSaveCode: saveCode, onOpenFile: { previewFile = $0 })
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(item.id)
+                    }
+                    statusLine
+                    runFooter
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom")
+                        .background {
+                            GeometryReader { g in
+                                Color.clear.preference(key: TailFrameKey.self,
+                                                       value: g.frame(in: .global).minY)
+                            }
+                        }
+                }
+                .echoColumn(nil)
+                .padding(.bottom, 20)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
+            .coordinateSpace(name: "echo.timeline")
+            .onPreferenceChange(TailFrameKey.self) { y in
+                atBottom = y < viewport + 60
+            }
+            .onChange(of: timeline.count) { _, _ in
+                if atBottom { scrollTo(proxy) }
+            }
+            .onChange(of: timeline.last?.text.count ?? 0) { _, _ in
+                if atBottom { scrollTo(proxy) }
+            }
+            .onChange(of: scrollTick) { _, _ in
+                atBottom = true
+                withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 1)) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .onAppear { scrollTo(proxy) }
+        }
+    }
+
+    private func scrollTo(_ proxy: ScrollViewProxy) {
+        var t = Transaction(animation: nil)
+        t.disablesAnimations = true
+        withTransaction(t) { proxy.scrollTo("bottom", anchor: .bottom) }
     }
 
     @ViewBuilder
     private var statusLine: some View {
         switch runtime.phase {
-        case .planning:
-            RunningLine(text: "Agent 正在拆解任务…")
-        case .executing:
-            RunningLine(text: "Agent 正在处理任务…")
-        case .summarising:
-            RunningLine(text: "Agent 正在整理结果…")
-        case .awaiting:
-            RunningLine(text: "计划已生成，等你确认", icon: "hand.raised.fill")
-        case .failed:
-            EmptyView()
-        default:
-            EmptyView()
+        case .planning: RunningLine(text: "正在拆解任务…")
+        case .executing: RunningLine(text: "正在执行…")
+        case .summarising: RunningLine(text: "正在整理结果…")
+        case .awaiting: RunningLine(text: "计划已生成，等你确认", icon: "hand.raised")
+        default: EmptyView()
         }
     }
 
@@ -166,17 +227,21 @@ struct ChatView: View {
             VStack(alignment: .leading, spacing: 10) {
                 if runtime.toolCount > 0 || runtime.thinkingCount > 0 {
                     Button {
-                        withAnimation(.snappy) { showDetails.toggle() }
+                        withAnimation(.easeInOut(duration: 0.18)) { showDetails.toggle() }
                     } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: showDetails ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
-                            Image(systemName: "pin.fill").font(.system(size: 12))
-                            Text("\(runtime.thinkingCount) 段思考 · \(runtime.toolCount) 次工具调用")
-                                .font(.system(size: 14.5, weight: .medium))
-                            Spacer()
+                            EchoIcon(showDetails ? "chevron.down" : "chevron.right", size: 10,
+                                     weight: .semibold)
+                                .frame(width: 10)
+                            EchoIcon("hammer", size: 15).frame(width: 18)
+                            Text("执行过程 · \(runtime.thinkingCount) 段思考 · \(runtime.toolCount) 次工具")
+                                .font(.system(.subheadline, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .foregroundStyle(Color(hex: "D9483B"))
+                        .foregroundStyle(.primary)
+                        .frame(minHeight: EchoM.markerHeight)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -184,40 +249,47 @@ struct ChatView: View {
                 if !files.isEmpty {
                     Button { showWorkspace = true } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "doc.text").font(.system(size: 14))
+                            EchoIcon("doc.text", size: 15).frame(width: 18).foregroundStyle(.secondary)
                             Text("\(files.count) 个文件")
-                                .font(.system(size: 14.5))
+                                .font(.system(.subheadline, design: .monospaced))
+                                .foregroundStyle(.secondary)
                             Text("+\(files.reduce(0) { $0 + $1.added })")
-                                .font(.system(size: 14.5, weight: .medium))
-                                .foregroundStyle(Color(hex: "2FA46B"))
-                            Text("−\(files.reduce(0) { $0 + $1.removed })")
-                                .font(.system(size: 14.5, weight: .medium))
-                                .foregroundStyle(Color(hex: "D9483B"))
-                            Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.green)
+                            if files.reduce(0, { $0 + $1.removed }) > 0 {
+                                Text("−\(files.reduce(0) { $0 + $1.removed })")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundStyle(.red)
+                            }
                             Spacer()
+                            EchoIcon("arrow.up.right", size: 12).foregroundStyle(.secondary)
                         }
-                        .foregroundStyle(.secondary)
+                        .frame(minHeight: EchoM.markerHeight)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
                 if runtime.phase == .done {
-                    HStack(spacing: 22) {
+                    HStack(spacing: 2) {
                         Button { copyAnswer() } label: {
-                            Image(systemName: "doc.on.doc").font(.system(size: 16))
+                            EchoIcon("doc.on.doc", size: 15).frame(width: 44, height: 44)
                         }
                         Button { shareAnswer() } label: {
-                            Image(systemName: "square.and.arrow.up").font(.system(size: 16))
+                            EchoIcon("square.and.arrow.up", size: 15).frame(width: 44, height: 44)
                         }
                         Button { speakAnswer() } label: {
-                            Image(systemName: speaking ? "stop.circle.fill" : "speaker.wave.2")
-                                .font(.system(size: 16))
+                            EchoIcon(speaking ? "stop.circle" : "speaker.wave.2", size: 15)
+                                .frame(width: 44, height: 44)
                         }
-                        Text(runtime.usage.text).font(.system(size: 12)).foregroundStyle(.tertiary)
-                        Spacer()
+                        Spacer(minLength: 8)
+                        Text(runtime.usage.text)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
+                    .font(.system(size: 15))
                     .foregroundStyle(.secondary)
+                    .padding(.leading, -10)
                 }
             }
         }
@@ -267,15 +339,16 @@ struct ChatView: View {
         runtime.persistIfNeeded(session: session, context: context)
         context.delete(session)
         try? context.save()
-        onMenu()
     }
 
     private func saveCode(_ code: String, _ lang: String) {
         let ext = CodeLang.ext(lang)
-        let name = "snippet-\(Int(Date.now.timeIntervalSince1970) % 100000).\(ext)"
+        let name = CodeFiles.normalize("snippet-\(Int(Date.now.timeIntervalSince1970) % 100000)",
+                                       ext: ext)
         do {
             _ = try FileStore.shared.write(name, code)
-            Notifier.shared.runDone(title: "已存为文件", body: name)
+            runtime.addNote("已存为文件 \(name)")
+            Notifier.shared.tap()
         } catch {
             Notifier.shared.runDone(title: "保存失败", body: error.localizedDescription)
         }
@@ -284,19 +357,21 @@ struct ChatView: View {
 
 struct RunningLine: View {
     let text: String
-    var icon: String? = nil
+    var icon: String?
 
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 8) {
             if let icon {
-                Image(systemName: icon).font(.system(size: 13))
+                EchoIcon(icon, size: 15).frame(width: 18)
             } else {
-                ProgressView().controlSize(.small)
+                ProgressView().controlSize(.mini).frame(width: 18, height: 18)
             }
-            Text(text).font(.system(size: 14.5)).foregroundStyle(.secondary)
+            Text(text)
+                .font(.system(.subheadline, design: .monospaced))
+                .foregroundStyle(.secondary)
             Spacer()
         }
-        .padding(.vertical, 2)
+        .frame(minHeight: EchoM.markerHeight)
     }
 }
 
@@ -315,11 +390,8 @@ struct ExportModifier: ViewModifier {
 
 enum CodeLang {
     static func ext(_ lang: String) -> String {
-        let map = ["javascript": "js", "typescript": "ts", "python": "py", "shell": "sh",
-                   "bash": "sh", "objective-c": "m", "c++": "cpp", "markdown": "md",
-                   "yaml": "yml", "jsonc": "json", "text": "txt", "plain": "txt"]
-        let l = lang.lowercased().trimmingCharacters(in: .whitespaces)
+        let l = lang.lowercased().trimmed
         if l.isEmpty { return "txt" }
-        return map[l] ?? l.components(separatedBy: " ").first ?? "txt"
+        return CodeFiles.extMap[l] ?? l.components(separatedBy: " ").first ?? "txt"
     }
 }

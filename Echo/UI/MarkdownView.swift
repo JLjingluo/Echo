@@ -166,10 +166,10 @@ enum MDParse {
 
 struct MarkdownView: View {
     let text: String
-    var size: CGFloat = 17
+    var size: CGFloat = 16
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 12) {
             ForEach(MDParse.blocks(text)) { block in
                 row(block)
             }
@@ -182,52 +182,50 @@ struct MarkdownView: View {
     private func row(_ b: MDBlock) -> some View {
         switch b.kind {
         case .heading(let level):
-            Text(MD.inline(b.lines.joined(separator: " "), size: size + headDelta(level)))
-                .font(.system(size: size + headDelta(level), weight: .bold))
-                .padding(.top, level <= 2 ? 10 : 5)
+            let s = size * (level <= 1 ? 1.5 : level == 2 ? 1.25 : 1.08)
+            Text(MD.inline(b.lines.joined(separator: " "), size: s))
+                .font(.system(size: s, weight: .semibold))
+                .padding(.top, level <= 2 ? 8 : 4)
+                .fixedSize(horizontal: false, vertical: true)
         case .para:
             Text(MD.inline(b.lines.joined(separator: "\n"), size: size))
-                .lineSpacing(6)
+                .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
         case .quote:
-            HStack(alignment: .top, spacing: 10) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.primary.opacity(0.16)).frame(width: 3)
-                    .padding(.vertical, 2)
-                Text(MD.inline(b.lines.joined(separator: "\n"), size: size - 1))
+            HStack(alignment: .top, spacing: size * 0.75) {
+                Capsule().fill(.primary.opacity(0.18)).frame(width: 3)
+                Text(MD.inline(b.lines.joined(separator: "\n"), size: size))
                     .foregroundStyle(.secondary)
                     .lineSpacing(4)
             }
+            .fixedSize(horizontal: false, vertical: true)
         case .bullet:
-            HStack(alignment: .firstTextBaseline, spacing: 9) {
-                Text("•").font(.system(size: size))
-                Text(MD.inline(b.lines.joined(separator: " "), size: size))
-                    .lineSpacing(4)
-                Spacer(minLength: 0)
-            }
-        case .ordered(let n):
-            HStack(alignment: .firstTextBaseline, spacing: 9) {
-                Text("\(n).")
-                    .font(.system(size: size - 1, weight: .medium))
+            HStack(alignment: .firstTextBaseline, spacing: size * 0.4) {
+                Image(systemName: "circle.fill")
+                    .font(.system(size: size * 0.33))
+                    .frame(width: size, alignment: .leading)
                     .foregroundStyle(.secondary)
-                    .frame(width: 20, alignment: .leading)
                 Text(MD.inline(b.lines.joined(separator: " "), size: size))
                     .lineSpacing(4)
                 Spacer(minLength: 0)
             }
+            .fixedSize(horizontal: false, vertical: true)
+        case .ordered(let n):
+            HStack(alignment: .firstTextBaseline, spacing: size * 0.4) {
+                Text("\(n).")
+                    .font(.system(size: size, weight: .medium, design: .default))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(width: size, alignment: .leading)
+                Text(MD.inline(b.lines.joined(separator: " "), size: size))
+                    .lineSpacing(4)
+                Spacer(minLength: 0)
+            }
+            .fixedSize(horizontal: false, vertical: true)
         case .rule:
             Divider().padding(.vertical, 4)
         case .table:
             MDTable(rows: b.lines, size: size)
-        }
-    }
-
-    private func headDelta(_ level: Int) -> CGFloat {
-        switch level {
-        case 1: return 8
-        case 2: return 5
-        case 3: return 2
-        default: return 0
         }
     }
 }

@@ -8,85 +8,172 @@ struct ItemRow: View {
     var body: some View {
         switch item.kind {
         case .user: UserCard(item: item)
-        case .text: TextBody(item: item)
+        case .text: TextBody(item: item, onSave: onSaveCode)
         case .code: CodeBody(item: item, onSave: onSaveCode)
         case .tool: ToolRow(item: item)
         case .file: FileRow(item: item, onOpen: onOpenFile)
         case .plan: PlanCard(steps: item.steps)
         case .error: ErrorRow(text: item.text)
-        case .note: DividerLabel(text: item.text)
+        case .note: MarkerSeparator(title: item.text)
         case .image: EmptyView()
         }
     }
 }
 
-struct UserCard: View {
-    let item: RunItem
+struct MarkerRow: View {
+    let title: String
+    var symbol: String = "hammer"
+    var expanded: Bool?
+    var accessory: String?
+    var failed: Bool = false
+    var live: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(item.text)
-                .font(.system(size: 17))
-                .lineSpacing(6)
-                .textSelection(.enabled)
-            if !item.images.isEmpty {
-                HStack(spacing: 8) {
-                    ForEach(Array(item.images.enumerated()), id: \.offset) { _, d in
-                        if let img = UIImage(data: d) {
-                            Image(uiImage: img)
-                                .resizable().scaledToFill()
-                                .frame(width: 84, height: 84)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        HStack(spacing: 8) {
+            if let expanded {
+                EchoIcon(expanded ? "chevron.down" : "chevron.right", size: 10, weight: .semibold)
+                    .frame(width: 10)
+            }
+            if live {
+                ProgressView().controlSize(.mini).frame(width: 18, height: 18)
+            } else {
+                EchoIcon(symbol, size: 15).frame(width: 18)
+            }
+            Text(title)
+                .font(.system(.subheadline, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let accessory {
+                EchoIcon(accessory, size: 14)
+            }
+        }
+        .foregroundStyle(failed ? Color.red : Color.primary)
+        .frame(minHeight: EchoM.markerHeight)
+        .contentShape(Rectangle())
+    }
+}
+
+struct MarkerSeparator: View {
+    let title: String
+    var body: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(.quaternary).frame(height: 1)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+            Rectangle().fill(.quaternary).frame(height: 1)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+struct CodePanel: View {
+    let label: String
+    let code: String
+    @Environment(\.colorScheme) private var scheme
+    @State private var copied = false
+
+    private var display: String {
+        code.count > 200_000 ? String(code.prefix(200_000)) : code
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text(label).font(.system(.caption, design: .monospaced))
+                Spacer()
+                Button {
+                    Notifier.copy(display)
+                    copied = true
+                } label: {
+                    EchoIcon(copied ? "checkmark" : "doc.on.doc", size: 15)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .task(id: copied) {
+                    guard copied else { return }
+                    try? await Task.sleep(for: .seconds(2))
+                    copied = false
+                }
+            }
+            .padding(.leading, 12)
+            .foregroundStyle(.secondary)
+            .background(.quaternary.opacity(0.3))
+
+            ScrollView([.horizontal, .vertical], showsIndicators: false) {
+                Text(display)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: min(320, max(76, CGFloat(display.components(separatedBy: "\n").count) * 19 + 24)))
+            .background(Color(uiColor: .secondarySystemBackground))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+struct UserCard: View {
+    let item: RunItem
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            Spacer(minLength: 48)
+            VStack(alignment: .trailing, spacing: 8) {
+                if !item.images.isEmpty {
+                    HStack(spacing: 8) {
+                        ForEach(Array(item.images.enumerated()), id: \.offset) { _, d in
+                            if let img = UIImage(data: d) {
+                                Image(uiImage: img)
+                                    .resizable().scaledToFill()
+                                    .frame(width: 96, height: 72)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            }
                         }
                     }
                 }
+                Text(item.text)
+                    .font(.body)
+                    .foregroundStyle(EchoTheme.primaryText(scheme))
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 17)
+                    .padding(.vertical, 12)
+                    .background(EchoTheme.rowFill(scheme),
+                                in: RoundedRectangle(cornerRadius: EchoM.bubbleRadius,
+                                                     style: .continuous))
             }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(hex: "F6F6F8"), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous)
-            .stroke(Color.primary.opacity(0.06), lineWidth: 0.6))
-        .padding(.top, 6)
     }
 }
 
 struct TextBody: View {
     let item: RunItem
+    var onSave: (String, String) -> Void = { _, _ in }
 
     var body: some View {
         if item.isReasoning {
             ReasonRow(text: item.text, live: item.status == .running)
         } else if item.isStepHeader {
-            HStack(spacing: 7) {
-                Circle().fill(Theme.accent).frame(width: 5, height: 5)
-                Text(item.text.dropFirst(2))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.secondary)
-                if item.status == .running {
-                    Spacer()
-                    ProgressView().controlSize(.mini)
-                }
-            }
-            .padding(.top, 4)
+            MarkerRow(title: String(item.text.dropFirst(2)), symbol: "arrow.right.circle",
+                      live: item.status == .running)
         } else {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: EchoM.blockSpacing) {
                 ForEach(Array(CodeSplitter.segments(item.text).enumerated()), id: \.offset) { _, seg in
                     if seg.kind == .code {
-                        CodeBlock(code: seg.body, language: seg.lang)
-                            .padding(.vertical, 6)
+                        CodeBlock(code: seg.body, language: seg.lang, onSave: onSave)
                     } else {
                         MarkdownView(text: seg.body)
-                            .padding(.bottom, 6)
-                    }
-                }
-                if item.status == .running {
-                    HStack(spacing: 6) {
-                        Circle().fill(Theme.accent).frame(width: 6, height: 6)
-                            .opacity(0.9)
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -106,32 +193,23 @@ struct ReasonRow: View {
     @State private var open = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             Button {
-                withAnimation(.snappy) { open.toggle() }
+                withAnimation(.easeInOut(duration: 0.18)) { open.toggle() }
             } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: open ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                    Image(systemName: "brain.head.profile").font(.system(size: 12))
-                    Text(live ? "思考中…" : "思考过程")
-                        .font(.system(size: 14))
-                    Spacer(minLength: 0)
-                }
-                .foregroundStyle(.secondary)
-                .contentShape(Rectangle())
+                MarkerRow(title: live ? "推理中…" : "推理过程", symbol: "sparkles",
+                          expanded: open, live: live)
             }
             .buttonStyle(.plain)
+            .accessibilityValue(open ? "已展开" : "已折叠")
             if open {
-                Text(text)
-                    .font(.system(size: 14))
+                MarkdownView(text: text)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .lineSpacing(5)
-                    .padding(.leading, 20)
-                    .textSelection(.enabled)
+                    .padding(.leading, 24)
+                    .transition(.identity)
             }
         }
-        .padding(.vertical, 2)
     }
 }
 
@@ -139,125 +217,96 @@ struct ToolRow: View {
     let item: RunItem
     @State private var open = false
 
-    var statusColor: Color {
-        switch item.status {
-        case .running: return Theme.accent
-        case .done: return Color(hex: "2FA46B")
-        case .failed: return Color(hex: "D9483B")
-        case .cancelled: return .secondary
-        default: return .secondary
-        }
+    private var name: String { item.call?.name ?? item.title }
+    private var failed: Bool { item.status == .failed }
+    private var args: String {
+        let a = item.call?.argsJSON ?? item.argsDisplay
+        return a.isEmpty ? "" : JSONHelper.pretty(a)
+    }
+    private var result: String {
+        let r = item.call?.result ?? item.text
+        return r == item.title ? "" : r
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             Button {
-                withAnimation(.snappy) { open.toggle() }
+                withAnimation(.easeInOut(duration: 0.18)) { open.toggle() }
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: open ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    if item.status == .running {
-                        ProgressView().controlSize(.mini)
-                    } else {
-                        Image(systemName: (ToolID(rawValue: item.call?.name ?? item.title) ?? .read_file).icon)
-                            .font(.system(size: 13))
-                    }
-                    Text(item.call?.name ?? item.title)
-                        .font(.system(size: 14.5, weight: .medium))
-                    Text(ToolID(rawValue: item.call?.name ?? "")?.label ?? "")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                    if let c = item.call, c.status == .done {
-                        Text(c.duration).font(.system(size: 12)).foregroundStyle(.secondary)
-                    }
-                    Circle().fill(statusColor).frame(width: 5.5, height: 5.5)
-                }
-                .contentShape(Rectangle())
+                MarkerRow(title: title, symbol: symbol, expanded: open,
+                          failed: failed, live: item.status == .running,
+                          accessory: item.call?.duration)
             }
             .buttonStyle(.plain)
-
+            .accessibilityValue(open ? "已展开" : "已折叠")
             if open {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let args = item.call?.argsJSON, !args.isEmpty {
-                        labeled("参数", JSONHelper.pretty(args))
-                    } else if !item.argsDisplay.isEmpty {
-                        labeled("参数", JSONHelper.pretty(item.argsDisplay))
-                    }
-                    if let r = item.call?.result, !r.isEmpty {
-                        labeled("结果", r)
-                    } else if !item.text.isEmpty, item.text != item.title {
-                        labeled("结果", item.text)
+                VStack(spacing: 0) {
+                    if !args.isEmpty { CodePanel(label: "参数", code: args) }
+                    if !result.isEmpty {
+                        if !args.isEmpty { Spacer().frame(height: 8) }
+                        CodePanel(label: "结果", code: result)
                     }
                 }
-                .padding(.leading, 20)
+                .padding(.leading, 24)
             }
         }
-        .padding(.vertical, 1.5)
     }
 
-    private func labeled(_ t: String, _ v: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(t).font(.system(size: 11)).foregroundStyle(.secondary)
-            Text(v.count > 3000 ? String(v.prefix(3000)) + "\n…(截断)" : v)
-                .font(.system(size: 12.5, design: .monospaced))
-                .textSelection(.enabled)
-                .padding(9)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.codeBG, in: RoundedRectangle(cornerRadius: 9))
-        }
+    private var title: String {
+        let label = ToolID(rawValue: name)?.label ?? ""
+        return label.isEmpty ? name : "\(name) · \(label)"
+    }
+
+    private var symbol: String {
+        (ToolID(rawValue: name) ?? .read_file).icon
     }
 }
 
 struct FileRow: View {
     let item: RunItem
     var onOpen: (RunFile) -> Void
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         if let f = item.file {
             Button { onOpen(f) } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: icon(f.ext))
-                        .font(.system(size: 15))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20)
+                HStack(spacing: 8) {
+                    EchoIcon(icon(f.ext), size: 18).foregroundStyle(.secondary)
+                    Text(f.ext.uppercased())
+                        .font(.caption2)
+                        .padding(5)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
                     Text(f.name)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(.caption, design: .monospaced))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Spacer(minLength: 6)
-                    Text("+\(f.added)")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color(hex: "2FA46B"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("+\(f.added)").font(.system(.caption, design: .monospaced)).foregroundStyle(.green)
                     if f.removed > 0 {
-                        Text("−\(f.removed)")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color(hex: "D9483B"))
+                        Text("−\(f.removed)").font(.system(.caption, design: .monospaced)).foregroundStyle(.red)
                     }
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                    EchoIcon("arrow.up.right", size: 12).foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 7)
                 .padding(.horizontal, 12)
-                .background(Color(hex: "F6F6F8"), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .frame(minHeight: EchoM.rowHeight)
+                .background(Color(uiColor: .secondarySystemBackground))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.vertical, 2)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .accessibilityHint("打开文件预览")
         }
     }
 
     private func icon(_ ext: String) -> String {
         switch ext {
         case "md", "txt", "log": return "doc.text"
-        case "swift", "js", "ts", "py", "go", "rs", "java", "c", "h": return "chevron.left.forwardslash.chevron.right"
-        case "html", "css": return "globe"
+        case "js", "ts", "py", "go", "rs", "java", "c", "h", "swift", "sh":
+            return "chevron.left.forwardslash.chevron.right"
+        case "html", "css", "svg", "xml": return "globe"
         case "json", "yml", "yaml", "toml", "ini": return "curlybraces"
         case "csv", "tsv", "xlsx": return "tablecells"
-        case "png", "jpg", "jpeg", "gif", "pdf": return "doc.richtext"
+        case "png", "jpg", "jpeg", "gif", "pdf", "heic": return "doc.richtext"
         default: return "doc"
         }
     }
@@ -265,50 +314,51 @@ struct FileRow: View {
 
 struct PlanCard: View {
     let steps: [StepState]
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(steps) { s in
-                HStack(alignment: .top, spacing: 10) {
-                    Group {
-                        switch s.status {
-                        case .done: Image(systemName: "checkmark.circle.fill")
-                        case .running: ProgressView().controlSize(.small)
-                        case .failed: Image(systemName: "x.circle.fill")
-                        case .cancelled: Image(systemName: "minus.circle")
-                        default: Image(systemName: "circle")
+        EchoSurface {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("执行计划")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
+                    HStack(alignment: .top, spacing: 10) {
+                        Group {
+                            switch s.status {
+                            case .done: EchoIcon("checkmark.circle.fill", size: 16)
+                            case .running: ProgressView().controlSize(.small).frame(width: 16, height: 16)
+                            case .failed: EchoIcon("x.circle.fill", size: 16)
+                            case .cancelled: EchoIcon("minus.circle", size: 16)
+                            default: EchoIcon("circle", size: 16)
+                            }
                         }
+                        .foregroundStyle(color(s.status))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(i + 1). \(s.title)")
+                                .font(.body)
+                                .strikethrough(s.status == .done, color: .secondary)
+                            if !s.detail.isEmpty {
+                                Text(s.detail).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                            if !s.note.isEmpty, s.status == .done {
+                                Text(s.note).font(.caption).foregroundStyle(.green).lineLimit(2)
+                            }
+                        }
+                        Spacer(minLength: 0)
                     }
-                    .font(.system(size: 15))
-                    .foregroundStyle(color(s.status))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(s.title)
-                            .font(.system(size: 15, weight: .medium))
-                            .strikethrough(s.status == .done, color: .secondary)
-                        if !s.detail.isEmpty {
-                            Text(s.detail).font(.system(size: 13)).foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        }
-                        if !s.note.isEmpty, s.status == .done {
-                            Text(s.note).font(.system(size: 12)).foregroundStyle(Color(hex: "2FA46B"))
-                                .lineLimit(2)
-                        }
-                    }
-                    Spacer(minLength: 0)
                 }
             }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(hex: "F6F6F8"), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .padding(.vertical, 4)
     }
 
     private func color(_ s: ItemStatus) -> Color {
         switch s {
-        case .done: return Color(hex: "2FA46B")
-        case .running: return Theme.accent
-        case .failed: return Color(hex: "D9483B")
+        case .done: return .green
+        case .running: return EchoTheme.primaryText(scheme)
+        case .failed: return .red
         default: return Color.secondary.opacity(0.5)
         }
     }
@@ -316,20 +366,34 @@ struct PlanCard: View {
 
 struct ErrorRow: View {
     let text: String
+    @State private var open = false
+
+    private var brief: String {
+        let low = text.lowercased()
+        if low.contains("invalid_api_key") || low.contains("incorrect api key")
+            || low.contains("apikey-error") || text.contains("401") {
+            return "Key 不对或没权限。点顶部「厂商 · 模型」重新粘贴 Key。"
+        }
+        if text.contains("403") { return "这个 Key 没有调用该模型的权限。" }
+        if text.contains("404") { return "Base URL 或模型名不对（404）。" }
+        if text.contains("429") { return "被限流了，等一会儿再试。" }
+        if text.contains("额度") || low.contains("insufficient") { return "账户额度或余额不足。" }
+        return text.components(separatedBy: "：").first ?? text
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 13))
-                .foregroundStyle(Color(hex: "D9483B"))
-            Text(text)
-                .font(.system(size: 14.5))
-                .foregroundStyle(Color(hex: "D9483B"))
-                .textSelection(.enabled)
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) { open.toggle() }
+            } label: {
+                MarkerRow(title: brief, symbol: "exclamationmark.triangle", expanded: open,
+                          failed: true)
+            }
+            .buttonStyle(.plain)
+            if open {
+                CodePanel(label: "原始返回", code: text)
+                    .padding(.leading, 24)
+            }
         }
-        .padding(12)
-        .background(Color(hex: "D9483B").opacity(0.07),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

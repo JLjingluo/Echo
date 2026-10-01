@@ -4,40 +4,106 @@ import SwiftData
 struct RootView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
+    @Environment(\.colorScheme) private var scheme
     @Query(sort: \ChatSession.updatedAt, order: .reverse) private var sessions: [ChatSession]
     @State private var current: ChatSession?
-    @State private var drawer = false
+    @State private var progress: CGFloat = 0
+    @State private var open = false
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Color(.systemBackground).ignoresSafeArea()
+        GeometryReader { geo in
+            let w = max(geo.size.width * EchoM.drawerFraction, 1)
+            ZStack(alignment: .leading) {
+                EchoTheme.background(scheme).ignoresSafeArea()
 
-            Group {
-                if let s = current {
-                    ChatView(session: s, onMenu: { withAnimation(.snappy) { drawer = true } })
-                        .id(s.id)
-                } else {
-                    ProgressView().controlSize(.large)
+                SidebarView(current: $current, progress: $progress, open: $open,
+                            sessions: sessions, reveal: w, insets: geo.safeAreaInsets)
+                    .frame(width: w)
+                    .frame(maxHeight: .infinity, alignment: .leading)
+                    .background(EchoTheme.background(scheme))
+                    .scaleEffect(EchoM.closedScale + (1 - EchoM.closedScale) * progress,
+                                 anchor: .leading)
+                    .overlay {
+                        EchoTheme.background(scheme)
+                            .opacity(EchoM.sidebarVeil * (1 - min(max(progress, 0), 1)))
+                    }
+                    .allowsHitTesting(progress > 0.001)
+
+                detail(insets: geo.safeAreaInsets, reveal: w)
+
+                if progress <= 0.001 {
+                    HStack {
+                        Color.clear
+                            .frame(width: EchoM.edgeActivation)
+                            .contentShape(Rectangle())
+                            .gesture(edgeDrag(w))
+                        Spacer()
+                    }
+                    .frame(maxHeight: .infinity)
+                    .allowsHitTesting(true)
                 }
             }
-
-            if drawer {
-                Color.black.opacity(0.22)
-                    .ignoresSafeArea()
-                    .onTapGesture { withAnimation(.snappy) { drawer = false } }
-                    .transition(.opacity)
-
-                SidebarView(current: $current, drawer: $drawer, sessions: sessions)
-                    .frame(width: min(340, UIScreen.main.bounds.width * 0.86))
-                    .frame(maxHeight: .infinity, alignment: .leading)
-                    .background(.regularMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-                    .shadow(color: .black.opacity(0.18), radius: 26, y: 6)
-                    .transition(.move(edge: .leading))
-            }
         }
+        .ignoresSafeArea()
         .onAppear(perform: ensure)
         .onChange(of: sessions.count) { _, _ in ensure() }
+    }
+
+    @ViewBuilder
+    private func detail(insets: EdgeInsets, reveal: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: progress > 0.001 ? 30 : 0, style: .continuous)
+        Group {
+            if let s = current {
+                ChatView(session: s, onMenu: { settle(true) })
+                    .id(s.id)
+            } else {
+                ProgressView().controlSize(.large)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(EchoTheme.background(scheme))
+        .clipShape(shape)
+        .overlay { shape.strokeBorder(Color.primary.opacity(0.2 * progress), lineWidth: 1) }
+        .overlay { Color.white.opacity(EchoM.contentScrim * progress) }
+        .shadow(color: .black.opacity(0.28 * progress), radius: 18, x: -3, y: 0)
+        .offset(x: reveal * progress)
+        .overlay {
+            if progress > 0.001 {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { settle(false) }
+            }
+        }
+    }
+
+    private func edgeDrag(_ reveal: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
+            .onChanged { v in
+                guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                progress = min(max(v.translation.width / reveal, 0), 1)
+            }
+            .onEnded { v in
+                let projected = (v.translation.width + v.velocity.width * 0.2) / reveal
+                settle(projected >= 0.5, velocity: v.velocity.width / reveal)
+            }
+    }
+
+    func settle(_ target: Bool, velocity: CGFloat = 0) {
+        let remaining = max(target ? 1 - progress : progress, 0.02)
+        let v = min(max(velocity / remaining, -8), 8)
+        if UIAccessibility.isReduceMotionEnabled {
+            progress = target ? 1 : 0
+            open = target
+            return
+        }
+        withAnimation(.interpolatingSpring(stiffness: 341, damping: 33, initialVelocity: v)) {
+            progress = target ? 1 : 0
+        }
+        if open != target {
+            open = target
+            Notifier.shared.tap()
+        }
     }
 
     private func ensure() {
@@ -60,79 +126,90 @@ struct RootView: View {
 struct SidebarView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
+    @Environment(\.colorScheme) private var scheme
     @Binding var current: ChatSession?
-    @Binding var drawer: Bool
+    @Binding var progress: CGFloat
+    @Binding var open: Bool
     let sessions: [ChatSession]
+    let reveal: CGFloat
+    let insets: EdgeInsets
     @State private var showSettings = false
-    @State private var query = ""
-
-    var filtered: [ChatSession] {
-        query.trimmed.isEmpty ? sessions
-            : sessions.filter { $0.title.localizedCaseInsensitiveContains(query) }
-    }
+    @State private var renaming: ChatSession?
+    @State private var draft = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Echo")
-                .font(.system(size: 30, weight: .heavy, design: .rounded))
-                .italic()
-                .padding(.top, 60)
-                .padding(.horizontal, 22)
-
-            HStack {
-                Text("会话").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-                Spacer()
-                Text("\(sessions.count)").font(.system(size: 12)).foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 22)
-            .padding(.top, 22)
+                .font(EchoFont.wordmark(26))
+                .foregroundStyle(EchoTheme.primaryText(scheme))
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.top, insets.top)
 
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 3) {
-                    ForEach(filtered) { s in
-                        row(s)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-            }
-
-            HStack(spacing: 12) {
-                Button {
-                    let s = ChatSession()
-                    context.insert(s)
-                    try? context.save()
-                    current = s
-                    withAnimation(.snappy) { drawer = false }
-                } label: {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Image(systemName: "square.and.pencil")
-                        Text("新会话").font(.system(size: 16, weight: .semibold))
+                        Text("会话")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(sessions.count)")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 14)
-                    .background(Color.black, in: Capsule())
-                }
-                .buttonStyle(.plain)
+                    .padding(.horizontal, EchoM.sectionInset)
+                    .padding(.top, 20)
+                    .padding(.bottom, 6)
 
-                Spacer()
+                    ForEach(sessions) { s in row(s) }
 
-                Button {
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(.primary)
-                        .frame(width: 46, height: 46)
-                        .background(Color.primary.opacity(0.06), in: Circle())
+                    if sessions.isEmpty {
+                        Text("还没有会话")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, EchoM.sectionInset)
+                            .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+                    }
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, EchoM.contentInset)
+                .padding(.top, 10)
+                .padding(.bottom, insets.bottom + EchoM.footerClear)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 26)
+            .scrollIndicators(.hidden)
+            .contentShape(Rectangle())
+            .gesture(dismissDrag)
+            .overlay(alignment: .bottom) { footer }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .alert("重命名会话", isPresented: Binding(
+            get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("会话标题", text: $draft)
+            Button("取消", role: .cancel) { renaming = nil }
+            Button("存储") {
+                if let s = renaming {
+                    let t = draft.trimmed
+                    if !t.isEmpty { s.title = t.clamped(24) }
+                    try? context.save()
+                }
+                renaming = nil
+            }
+        }
+    }
+
+    private var dismissDrag: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
+            .onChanged { v in
+                guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                progress = min(max(1 + v.translation.width / reveal, 0), 1)
+            }
+            .onEnded { v in
+                let projected = 1 + (v.translation.width + v.velocity.width * 0.2) / reveal
+                withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) {
+                    progress = projected >= 0.5 ? 1 : 0
+                }
+                open = projected >= 0.5
+            }
     }
 
     private func row(_ s: ChatSession) -> some View {
@@ -140,38 +217,104 @@ struct SidebarView: View {
         return Button {
             app.runtime.persistIfNeeded(session: s, context: context)
             current = s
-            withAnimation(.snappy) { drawer = false }
+            withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) {
+                progress = 0
+            }
+            open = false
         } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 7) {
-                    Text(s.title)
-                        .font(.system(size: 16, weight: .semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text(s.title.isEmpty ? "新会话" : s.title)
+                        .font(.body)
+                        .foregroundStyle(EchoTheme.primaryText(scheme))
                         .lineLimit(1)
-                        .foregroundStyle(.primary)
-                    Spacer(minLength: 4)
-                    if app.runtime.sessionId == s.id && app.runtime.isBusy {
-                        Circle().fill(Color(hex: "2FA46B")).frame(width: 7, height: 7)
-                    }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    indicator(s)
                 }
                 Text(s.previewText.trimmed.isEmpty ? "还没有内容" : s.previewText.trimmed)
-                    .font(.system(size: 13))
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
+            .padding(.leading, 10)
+            .padding(.trailing, 10)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(active ? Color.primary.opacity(0.07) : .clear,
-                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .frame(minHeight: EchoM.rowHeight)
+            .background {
+                if active {
+                    Rectangle()
+                        .fill(EchoTheme.selectionFill(scheme))
+                        .padding(.leading, -(EchoM.contentInset + insets.leading))
+                        .padding(.trailing, -(EchoM.contentInset + insets.trailing))
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contextMenu {
+            Button("重命名", systemImage: "pencil") {
+                draft = s.title
+                renaming = s
+            }
             Button("删除", systemImage: "trash", role: .destructive) {
                 context.delete(s)
                 try? context.save()
                 if current?.id == s.id { current = nil }
             }
         }
+    }
+
+    @ViewBuilder
+    private func indicator(_ s: ChatSession) -> some View {
+        if app.runtime.sessionId == s.id && app.runtime.needsApproval {
+            Text("等待批准")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.mint)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(.mint.opacity(0.16), in: Capsule())
+                .fixedSize()
+        } else if app.runtime.sessionId == s.id && app.runtime.isBusy {
+            ProgressView()
+                .controlSize(.mini)
+                .tint(.primary)
+                .frame(width: 14, height: 14)
+        } else if app.runtime.sessionId == s.id && app.runtime.phase == .failed {
+            EchoIcon("exclamationmark.circle", size: 14).foregroundStyle(.red)
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            EchoGlassButton("新会话", systemImage: "square.and.pencil", style: .prominent,
+                            maxWidth: nil) {
+                let s = ChatSession()
+                context.insert(s)
+                try? context.save()
+                current = s
+                withAnimation(.interpolatingSpring(stiffness: 341, damping: 33)) {
+                    progress = 0
+                }
+                open = false
+            }
+            .font(.body.weight(.semibold))
+
+            Spacer(minLength: 12)
+
+            Button { showSettings = true } label: {
+                EchoIcon("gearshape", size: 19)
+                    .foregroundStyle(EchoTheme.primaryText(scheme))
+                    .frame(width: 38, height: 38)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .glass(.circle)
+            .accessibilityLabel("设置")
+        }
+        .padding(.leading, EchoM.contentInset + 4)
+        .padding(.trailing, EchoM.contentInset + 4)
+        .frame(height: EchoM.touch + 8)
+        .padding(.bottom, max(insets.bottom, 12))
     }
 }

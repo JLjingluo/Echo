@@ -8,6 +8,7 @@ struct EchoApp: App {
     private let container: ModelContainer
 
     init() {
+        EchoFont.register()
         container = Self.makeContainer()
     }
 
@@ -41,7 +42,7 @@ struct EchoApp: App {
         WindowGroup {
             RootView()
                 .environment(app)
-                .preferredColorScheme(nil)
+                .preferredColorScheme(app.appearance.scheme)
                 .task {
                     Notifier.shared.requestAuth()
                     if !app.onboarded { showOnboard = true }

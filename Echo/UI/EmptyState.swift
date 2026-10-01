@@ -75,33 +75,35 @@ enum EchoWheel {
 
 struct EmptyState: View {
     @Environment(AppState.self) private var app
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var dynamicType
     var onPick: (String) -> Void
     var openModel: () -> Void = {}
 
     @State private var round = EchoWheel.round()
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 12)
-
-            Image(systemName: "sparkle")
-                .font(.system(size: 27, weight: .ultraLight))
-                .foregroundStyle(Color.primary.opacity(0.62))
+        VStack(alignment: .leading, spacing: 12) {
+            EchoIcon("sparkles", size: 28)
+                .foregroundStyle(EchoTheme.primaryText(scheme))
 
             Text(round.title)
-                .font(.system(size: 33, weight: .bold))
-                .foregroundStyle(.primary)
-                .padding(.top, 16)
-                .contentTransition(.opacity)
+                .font(.system(size: titleSize, weight: .bold))
+                .foregroundStyle(EchoTheme.primaryText(scheme))
+                .lineLimit(dynamicType.isAccessibilitySize ? nil : 1)
+                .minimumScaleFactor(dynamicType.isAccessibilitySize ? 1 : 0.45)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.trailing, 24)
 
-            Text("描述目标、贴进资料，或从相册丢一张图进来。\nEcho 在手机本地拆解任务、跑工具，产出直接交给你。")
-                .font(.system(size: 15))
+            Text("描述目标、贴进资料，或从相册丢一张图进来。Echo 在手机本地拆解任务、跑工具，产出直接交给你。")
+                .font(.body)
                 .foregroundStyle(.secondary)
-                .lineSpacing(5)
-                .padding(.top, 12)
+                .lineLimit(4)
+                .fixedSize(horizontal: false, vertical: true)
 
             modelRow
-                .padding(.top, 26)
+                .padding(.top, 6)
 
             FlowLayout(spacing: 10) {
                 ForEach(round.picks, id: \.self) { s in
@@ -109,51 +111,50 @@ struct EmptyState: View {
                         Notifier.shared.tap()
                         onPick(s.text)
                     } label: {
-                        HStack(spacing: 7) {
-                            Image(systemName: s.icon).font(.system(size: 13, weight: .medium))
-                            Text(s.text).font(.system(size: 14, weight: .medium))
+                        HStack(spacing: 8) {
+                            EchoIcon(s.icon, size: 15).frame(width: 18)
+                            Text(s.text)
+                                .font(.subheadline.weight(.medium))
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
                         }
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(EchoTheme.primaryText(scheme))
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .glass(.capsule)
+                        .frame(minHeight: EchoM.rowHeight)
+                        .glass(.capsule, interactive: true)
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.top, 18)
-
-            Spacer(minLength: 8)
+            .padding(.top, 14)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 6)
+        .echoColumn(nil)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .onAppear { round = EchoWheel.round() }
-        .animation(.snappy, value: round.title)
+        .animation(.smooth(duration: 0.24), value: round.title)
     }
 
     private var modelRow: some View {
         Button(action: openModel) {
             VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Text(app.vendorName)
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.primary)
+                        .font(.body.weight(.medium))
+                        .underline()
+                        .foregroundStyle(EchoTheme.primaryText(scheme))
                         .lineLimit(1)
-                    Text(app.settings.model.isEmpty ? "选一个模型" : app.settings.model)
-                        .font(.system(size: 13.5, design: .monospaced))
+                    Text(app.settings.model.isEmpty ? "选择模型" : app.settings.model)
+                        .font(.system(.subheadline, design: .monospaced))
+                        .underline()
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if app.apiKey.isEmpty {
                         Text("未填 Key")
-                            .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(Color(hex: "D9483B"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.red)
                     }
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(.tertiary)
                     Spacer(minLength: 0)
                 }
                 Rectangle()
@@ -163,5 +164,6 @@ struct EmptyState: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("厂商与模型")
     }
 }

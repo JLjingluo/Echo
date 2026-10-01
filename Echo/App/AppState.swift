@@ -8,6 +8,7 @@ final class AppState {
     var settings = AppSettings()
     var apiKey = ""
     var onboarded = false
+    var appearance: EchoAppearance = .system
 
     let runtime = AgentRuntime()
     let store = FileStore.shared
@@ -37,12 +38,14 @@ final class AppState {
         }
         apiKey = KeychainStore.key(for: settings.provider, vendor: settings.vendorID)
         onboarded = defaults.bool(forKey: "echo.onboarded")
+        appearance = EchoAppearance(rawValue: defaults.string(forKey: "echo.appearance") ?? "") ?? .system
     }
 
     func save() {
         if let data = try? JSONEncoder().encode(settings) {
             defaults.set(data, forKey: Self.settingsKey)
         }
+        defaults.set(appearance.rawValue, forKey: "echo.appearance")
         Notifier.settingsHaptics = settings.haptics
     }
 

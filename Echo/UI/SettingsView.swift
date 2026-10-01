@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showKey = false
     @State private var promptEditing = false
+    @State private var showModel = false
     @State private var note = ""
 
     var body: some View {
@@ -69,31 +70,34 @@ struct SettingsView: View {
                     Text("每个厂商的 Key 分开保存，切厂商不会丢。")
                 }
 
-                Section("模型") {
-                    if let vendor = app.vendor, !vendor.models.isEmpty {
-                        Picker("模型", selection: $app.settings.model) {
-                            ForEach(vendor.models, id: \.self) { Text($0).tag($0) }
-                            if !vendor.models.contains(app.settings.model) {
-                                Text(app.settings.model).tag(app.settings.model)
-                            }
+                Section {
+                    Button { showModel = true } label: {
+                        HStack {
+                            Text("厂商与模型")
+                            Spacer()
+                            Text(app.settings.model.isEmpty ? "未选" : app.settings.model)
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
                         }
-                        .pickerStyle(.menu)
                     }
-                    TextField("或手填模型名", text: $app.settings.model)
-                        .font(.system(size: 15, design: .monospaced))
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    LabeledContent("Base URL") {
-                        TextField("", text: $app.settings.baseURL, prompt: Text("https://..."))
-                            .multilineTextAlignment(.trailing)
-                            .font(.system(size: 13, design: .monospaced))
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                    .sheet(isPresented: $showModel) { ModelPickerSheet() }
+                    if !NoToolMemory.all.isEmpty {
+                        Button("清除「这个模型不能调工具」的记忆（\(NoToolMemory.all.count)）") {
+                            NoToolMemory.clear()
+                            note = "已清除，下次会重新尝试调用工具"
+                        }
                     }
-                    if app.settings.modelIsReasoningOnly {
-                        Label("这个模型不支持工具调用，Agent 会直接回答", systemImage: "exclamationmark.triangle")
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(Color(hex: "D9483B"))
+                } header: {
+                    Text("模型")
+                } footer: {
+                    Text("填好 Key 后进入「厂商与模型」，点读取按钮就能选厂商官方列出的所有模型。")
+                }
+
+                Section("外观") {
+                    Picker("配色", selection: $app.appearance) {
+                        ForEach(EchoAppearance.allCases) { a in Text(a.label).tag(a) }
                     }
                 }
 

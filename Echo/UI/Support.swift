@@ -60,21 +60,34 @@ struct CodeBlock: View {
     var onSave: (String, String) -> Void = { _, _ in }
 
     @State private var wrapped = false
+    @State private var copied = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(language.isEmpty ? "text" : language)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
-                Spacer()
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Text(verbatim: language.isEmpty ? "text" : language)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
                 Button { wrapped.toggle() } label: {
-                    Image(systemName: "text.justify")
-                        .font(.caption)
-                        .foregroundStyle(wrapped ? Theme.accent : Color.secondary)
+                    EchoIcon("text.alignleft", size: 15)
+                        .foregroundStyle(wrapped ? Color.primary : Color.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderless)
-                CopyLabel(text: code, systemImage: "doc.on.doc")
+                .buttonStyle(.plain)
+                Button {
+                    Notifier.copy(code)
+                    copied = true
+                } label: {
+                    HStack(spacing: 4) {
+                        EchoIcon(copied ? "checkmark" : "doc.on.doc", size: 15)
+                        Text(copied ? "已复制" : "复制").font(.caption)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
                 Menu {
                     Button("存为文件", systemImage: "square.and.arrow.down") {
                         onSave(code, language)
@@ -83,11 +96,18 @@ struct CodeBlock: View {
                         ShareHelper.share(items: [code])
                     }
                 } label: {
-                    Image(systemName: "ellipsis").font(.caption)
+                    EchoIcon("ellipsis", size: 15)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .frame(height: 40)
+            .background(Color.primary.opacity(0.04))
+
+            Divider().opacity(0.5)
 
             Group {
                 if wrapped {
@@ -95,19 +115,29 @@ struct CodeBlock: View {
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         Text(code)
                             .font(.system(.caption, design: .monospaced))
                             .textSelection(.enabled)
                             .fixedSize(horizontal: true, vertical: false)
-                            .padding(.trailing, 8)
+                            .padding(12)
                     }
                 }
             }
-            .padding(10)
-            .background(Color.codeBG, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary, lineWidth: 1))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(uiColor: .secondarySystemBackground))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: EchoM.codeRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: EchoM.codeRadius, style: .continuous)
+                .stroke(.primary.opacity(0.07), lineWidth: 0.5)
+        )
+        .task(id: copied) {
+            guard copied else { return }
+            try? await Task.sleep(for: .seconds(2))
+            copied = false
         }
     }
 }
