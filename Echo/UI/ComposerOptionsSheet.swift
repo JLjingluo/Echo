@@ -3,7 +3,6 @@ import SwiftUI
 struct ComposerOptionsSheet: View {
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var scheme
 
     var onPhotos: () -> Void = {}
     var onFiles: () -> Void = {}
@@ -14,188 +13,134 @@ struct ComposerOptionsSheet: View {
         @Bindable var app = app
         NavigationStack {
             ScrollView {
-                VStack(spacing: 22) {
+                VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 12) {
-                        tile("照片", icon: "photo.on.rectangle", action: onPhotos)
-                        tile("文件", icon: "doc", action: onFiles)
+                        tile("照片", glyph: .search, action: onPhotos)
+                        tile("文件", glyph: .folder, action: onFiles)
+                        tile(app.voice.listening ? "停止听" : "语音", glyph: .mic, action: onVoice)
+                        tile("粘贴板", glyph: .doc, action: onPaste)
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
 
-                    EchoSurface {
-                        VStack(spacing: 0) {
-                            toggleRow("语音输入", icon: app.voice.listening ? "stop.circle.fill" : "mic",
-                                      value: nil, action: onVoice)
-                            Divider().padding(.leading, 52)
-                            row("粘贴板", icon: "doc.on.clipboard", value: nil, action: onPaste)
-                            Divider().padding(.leading, 52)
-                            Menu {
-                                Button("自动") { setMode("auto") }
-                                Button("强制开") { setMode("on") }
-                                Button("强制关") { setMode("off") }
-                            } label: {
-                                HStack(spacing: 14) {
-                                    EchoIcon("brain.head.profile", size: 20).frame(width: 23)
-                                    Text("深度思考").font(.body)
-                                    Spacer(minLength: 8)
-                                    Text(modeLabel).font(.subheadline).foregroundStyle(.secondary)
-                                    EchoIcon("chevron.right", size: 13).foregroundStyle(.secondary)
-                                }
-                                .padding(16)
-                                .contentShape(Rectangle())
+                    HandSectionHeader(text: "这一轮")
+                    HStack(spacing: 10) {
+                        Text("深度思考").font(Hand.body(16)).foregroundStyle(Ink.line)
+                        Spacer()
+                        HandSegmented(options: [("自动", "auto"), ("开", "on"), ("关", "off")],
+                                      selection: thinkingBinding)
+                    }
+                    .frame(minHeight: 50)
+                    Text(app.settings.thinkingHint)
+                        .font(Hand.body(12)).foregroundStyle(Ink.gray)
+                    HStack(spacing: 10) {
+                        Text("计划自动执行").font(Hand.body(16)).foregroundStyle(Ink.line)
+                        Spacer()
+                        HandToggle(isOn: $app.settings.autoApprove, seed: 901)
+                    }
+                    .frame(minHeight: 50)
+                    HStack(spacing: 10) {
+                        Text("流式输出").font(Hand.body(16)).foregroundStyle(Ink.line)
+                        Spacer()
+                        HandToggle(isOn: $app.settings.stream, seed: 902)
+                    }
+                    .frame(minHeight: 50)
+
+                    HandSectionHeader(text: "工具")
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
+                                        GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                        ForEach(Array(ToolID.allCases.enumerated()), id: \.offset) { i, t in
+                            HStack(spacing: 8) {
+                                Text(t.label)
+                                    .font(Hand.body(14))
+                                    .foregroundStyle(app.settings.enabledTools.contains(t.rawValue)
+                                                     ? Ink.line : Ink.faint)
+                                    .lineLimit(1)
+                                Spacer(minLength: 4)
+                                HandToggle(isOn: toolBinding(t), seed: UInt64(910 + i))
+                                    .scaleEffect(0.85)
                             }
-                            .buttonStyle(.plain)
-                            Text(app.settings.thinkingHint)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 12)
-                            Divider().padding(.leading, 52)
-                            toggle("计划自动执行", icon: "play.circle", isOn: $app.settings.autoApprove)
-                            Divider().padding(.leading, 52)
-                            toggle("流式输出", icon: "text.append", isOn: $app.settings.stream)
+                            .padding(.horizontal, 10)
+                            .frame(height: 44)
+                            .sketch(seed: UInt64(930 + i), corner: 12,
+                                    color: app.settings.enabledTools.contains(t.rawValue)
+                                        ? Ink.line : Ink.faint, width: 1.3)
                         }
                     }
 
-                    EchoSurface {
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text("工具")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8),
-                                                GridItem(.flexible(), spacing: 8)],
-                                      spacing: 8) {
-                                ForEach(ToolID.allCases, id: \.rawValue) { t in
-                                    Toggle(isOn: toolBinding(t)) {
-                                        HStack(spacing: 6) {
-                                            EchoIcon(t.icon, size: 14)
-                                            Text(t.label).font(.footnote.weight(.medium))
-                                                .lineLimit(1)
-                                            Spacer(minLength: 0)
-                                        }
-                                    }
-                                    .toggleStyle(.button)
-                                    .buttonStyle(.borderless)
-                                    .controlSize(.small)
-                                }
-                            }
-                        }
-                        .padding(16)
+                    HandSectionHeader(text: "外观")
+                    HStack {
+                        Text("配色").font(Hand.body(16)).foregroundStyle(Ink.line)
+                        Spacer()
+                        HandSegmented(options: EchoAppearance.allCases.map {
+                            (label: $0.label, value: $0.rawValue)
+                        }, selection: appearanceBinding)
                     }
-
-                    EchoSurface {
-                        VStack(spacing: 0) {
-                            ForEach(Array(Array(EchoAppearance.allCases).enumerated()), id: \.offset) { i, a in
-                                if i > 0 { Divider().padding(.leading, 52) }
-                                Button {
-                                    app.appearance = a
-                                    app.save()
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        ZStack {
-                                            EchoIcon("checkmark", size: 16, weight: .semibold)
-                                                .opacity(app.appearance == a ? 1 : 0)
-                                        }
-                                        .frame(width: 20, height: 20)
-                                        Text(a.label).font(.body.weight(.medium))
-                                        Spacer()
-                                    }
-                                    .foregroundStyle(.primary)
-                                    .padding(16)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
+                    .frame(minHeight: 50)
 
                     if !NoToolMemory.all.isEmpty {
-                        EchoSurface {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("被接口拒绝过工具调用的模型：\(NoToolMemory.all.joined(separator: ", "))")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                Button("清除这个记忆") {
-                                    NoToolMemory.clear()
-                                }
-                                .font(.footnote.weight(.medium))
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(16)
+                        HandSectionHeader(text: "工具记忆")
+                        Text("这些模型被接口拒绝过工具调用：" + NoToolMemory.all.joined(separator: ", "))
+                            .font(Hand.body(13)).foregroundStyle(Ink.gray)
+                        Button {
+                            NoToolMemory.clear()
+                            dismiss()
+                        } label: {
+                            Text("清除这个记忆")
+                                .font(Hand.body(14).weight(.semibold))
+                                .foregroundStyle(Ink.accent)
+                                .padding(.horizontal, 12)
+                                .frame(height: 34)
+                                .sketch(seed: 941, capsule: true, color: Ink.accent, width: 1.4)
                         }
+                        .buttonStyle(.plain)
+                        .padding(.top, 6)
                     }
+
+                    Spacer(minLength: 40)
                 }
-                .padding(20)
+                .padding(.horizontal, Gutter.edge)
             }
-            .buttonStyle(.plain)
+            .scrollIndicators(.hidden)
+            .background(Ink.paper.ignoresSafeArea())
+            .overlay { PaperGrain(density: 400).ignoresSafeArea() }
             .navigationTitle("对话选项")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Ink.paper, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button { dismiss() } label: {
+                        HandIcon(glyph: .close, size: 15, color: Ink.line, seed: 950)
+                            .frame(width: 34, height: 34)
+                            .overlay(SketchCircle(seed: 951)
+                                .stroke(Ink.line, lineWidth: 1.5))
+                    }
                 }
             }
         }
     }
 
-    private func tile(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func tile(_ title: String, glyph: HandGlyph, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 12) {
-                EchoIcon(icon, size: 27).foregroundStyle(.primary)
-                Text(title).font(.subheadline.weight(.medium))
+            VStack(spacing: 8) {
+                HandIcon(glyph: glyph, size: 22, color: Ink.line, seed: 960)
+                Text(title).font(Hand.body(14)).foregroundStyle(Ink.line)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 104)
-            .background { EchoSurface { Color.clear } }
+            .frame(height: 84)
+            .sketch(seed: 961, corner: 14, double: true, gapSide: 3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private func row(_ title: String, icon: String, value: String?, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                EchoIcon(icon, size: 20).frame(width: 23)
-                Text(title).font(.body)
-                Spacer(minLength: 8)
-                if let value {
-                    Text(value).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
-                }
-            }
-            .foregroundStyle(.primary)
-            .padding(16)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+    private var thinkingBinding: Binding<String> {
+        Binding(get: { app.settings.thinkingMode },
+                set: { app.settings.thinkingMode = $0; app.save() })
     }
 
-    private func toggleRow(_ title: String, icon: String, value: String?, action: @escaping () -> Void) -> some View {
-        row(title, icon: icon, value: value, action: action)
-    }
-
-    private func toggle(_ title: String, icon: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
-            HStack(spacing: 14) {
-                EchoIcon(icon, size: 20).frame(width: 23)
-                Text(title).font(.body)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-
-    private var modeLabel: String {
-        switch app.settings.thinkingMode {
-        case "on": return "强制开"
-        case "off": return "强制关"
-        default: return "自动"
-        }
-    }
-
-    private func setMode(_ v: String) {
-        app.settings.thinkingMode = v
-        app.save()
-        Notifier.shared.tap()
+    private var appearanceBinding: Binding<String> {
+        Binding(get: { app.appearance.rawValue },
+                set: { app.appearance = EchoAppearance(rawValue: $0) ?? .system; app.save() })
     }
 
     private func toolBinding(_ t: ToolID) -> Binding<Bool> {

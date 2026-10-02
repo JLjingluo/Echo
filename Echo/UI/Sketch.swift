@@ -361,6 +361,229 @@ extension View {
     }
 }
 
+// MARK: - Composite hand-drawn controls
+
+struct HandToggle: View {
+    @Binding var isOn: Bool
+    var seed: UInt64 = 700
+
+    var body: some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.18)) { isOn.toggle() }
+            Notifier.shared.tap()
+        } label: {
+            ZStack(alignment: isOn ? .trailing : .leading) {
+                SketchCapsule(seed: seed)
+                    .stroke(isOn ? Ink.accent : Ink.faint,
+                            style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+                if isOn {
+                    Hatch(spacing: 6, inset: 4)
+                        .stroke(Ink.accent.opacity(0.25), lineWidth: 1)
+                        .clipShape(Capsule())
+                }
+                SketchCircle(seed: seed &+ 3, open: false)
+                    .fill(isOn ? Ink.accent : Ink.paper)
+                    .overlay(SketchCircle(seed: seed &+ 3, open: false)
+                        .stroke(isOn ? Ink.accent : Ink.gray, lineWidth: 1.5))
+                    .padding(3)
+                    .frame(width: 26, height: 26)
+            }
+            .frame(width: 52, height: 30)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(isOn ? "开" : "关")
+    }
+}
+
+struct HandSegmented: View {
+    let options: [(label: String, value: String)]
+    @Binding var selection: String
+    var seed: UInt64 = 710
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ForEach(options, id: \.value) { o in
+                let on = o.value == selection
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) { selection = o.value }
+                } label: {
+                    Text(o.label)
+                        .font(Hand.body(15).weight(on ? .semibold : .regular))
+                        .foregroundStyle(on ? Ink.line : Ink.gray)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .overlay {
+                            if on {
+                                SketchRect(seed: seed &+ UInt64(o.value.hash & 255),
+                                           corner: 12, wobble: 0.9)
+                                    .stroke(Ink.accent,
+                                            style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+                                    .padding(-2)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+struct HandCounter: View {
+    let label: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    let step: Int
+    var unit: String = ""
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(label).font(Hand.body(16)).foregroundStyle(Ink.line)
+            Spacer()
+            stepButton(-1)
+            Text("\(value)\(unit)")
+                .font(Hand.mono(15))
+                .foregroundStyle(Ink.line)
+                .frame(minWidth: 44)
+            stepButton(1)
+        }
+        .frame(minHeight: 46)
+    }
+
+    private func stepButton(_ d: Int) -> some View {
+        Button {
+            let next = value + d * step
+            guard range.contains(next) else { return }
+            withAnimation(.easeOut(duration: 0.12)) { value = next }
+        } label: {
+            HandIcon(glyph: d < 0 ? .close : .plus, size: 13,
+                     color: range.contains(value + d * step) ? Ink.line : Ink.faint,
+                     seed: UInt64(720 + d))
+                .rotationEffect(.degrees(d < 0 ? 45 : 0))
+                .frame(width: 30, height: 30)
+                .overlay(SketchCircle(seed: UInt64(730 + d))
+                    .stroke(range.contains(value + d * step) ? Ink.line : Ink.faint,
+                            lineWidth: 1.4))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!range.contains(value + d * step))
+    }
+}
+
+struct HandRow: View {
+    let glyph: HandGlyph
+    let title: String
+    var value: String = ""
+    var valueAccent = false
+    var divider = true
+    var action: (() -> Void)? = nil
+
+    var body: some View {
+        Group {
+            if let action {
+                Button(action: action) { content }
+                    .buttonStyle(.plain)
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                HandIcon(glyph: glyph, size: 19, color: Ink.gray, seed: 741)
+                    .frame(width: 24)
+                Text(title)
+                    .font(Hand.body(16))
+                    .foregroundStyle(Ink.line)
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                if !value.isEmpty {
+                    Text(value)
+                        .font(Hand.mono(13))
+                        .foregroundStyle(valueAccent ? Ink.accent : Ink.gray)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if action != nil {
+                    HandIcon(glyph: .chevron, size: 12, color: Ink.faint, seed: 742)
+                        .rotationEffect(.degrees(-90))
+                }
+            }
+            .frame(minHeight: 50)
+            if divider {
+                SketchRect(seed: 743, corner: 1, wobble: 0.6)
+                    .stroke(Ink.faint.opacity(0.4), lineWidth: 1)
+                    .frame(height: 1)
+                    .padding(.leading, 36)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+struct HandSectionHeader: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(Hand.pencil(19))
+            .foregroundStyle(Ink.faint)
+            .padding(.top, 22)
+            .padding(.bottom, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct HandSearchField: View {
+    @Binding var text: String
+    var prompt: String = "搜"
+
+    var body: some View {
+        HStack(spacing: 8) {
+            HandIcon(glyph: .search, size: 16, color: Ink.gray, seed: 751)
+            TextField(prompt, text: $text)
+                .font(Hand.body(15))
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !text.isEmpty {
+                Button { text = "" } label: {
+                    HandIcon(glyph: .close, size: 12, color: Ink.gray, seed: 752)
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 40)
+        .sketch(seed: 753, capsule: true, color: Ink.faint, width: 1.3)
+    }
+}
+
+extension View {
+    func handSheet(title: String) -> some View {
+        self
+            .background(Ink.paper.ignoresSafeArea())
+            .overlay(alignment: .top) {
+                VStack(spacing: 6) {
+                    SketchRect(seed: 761, corner: 2, wobble: 0.8)
+                        .stroke(Ink.faint, lineWidth: 2)
+                        .frame(width: 40, height: 4)
+                        .padding(.top, 8)
+                    Text(title)
+                        .font(Hand.display(22))
+                        .foregroundStyle(Ink.line)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, Gutter.edge)
+                }
+                .padding(.top, 4)
+            }
+            .safeAreaInset(edge: .top) { Color.clear.frame(height: 58) }
+    }
+}
+
 // MARK: - Hand-drawn icons
 
 enum HandGlyph: String, CaseIterable {
@@ -545,6 +768,10 @@ enum Hand {
     static func pencil(_ size: CGFloat) -> Font {
         EchoFont.hasCaveat ? .custom("Caveat", fixedSize: size).weight(.semibold)
             : .system(size: size, weight: .medium, design: .rounded)
+    }
+
+    static func auto(_ s: String, _ size: CGFloat) -> Font {
+        s.allSatisfy { $0.isASCII && !$0.isWhitespace } ? pencil(size + 3) : body(size)
     }
 
     static func display(_ size: CGFloat) -> Font { .system(size: size, weight: .black) }

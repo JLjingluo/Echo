@@ -76,85 +76,94 @@ struct EchoApp: App {
 
 struct OnboardView: View {
     @Environment(AppState.self) private var app
-    @Environment(\.colorScheme) private var scheme
     var onDone: () -> Void
     @State private var showModel = false
 
     var body: some View {
         @Bindable var app = app
         NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Echo")
-                            .font(EchoFont.wordmark(30))
-                            .foregroundStyle(EchoTheme.primaryText(scheme))
-                        Text("不经过我们的服务器：会话、文件、Key 都只在你手机上；调用模型时直连你选的那家厂商。图片会以 base64 发给该厂商做识别，联网抓取会走公开搜索引擎。")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.vertical, 6)
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    BrandFace(size: 84, seed: 990)
+                        .padding(.top, 30)
 
-                Section("1. 厂商与 Key") {
-                    Button { showModel = true } label: {
-                        HStack {
-                            Text("厂商与模型")
-                            Spacer()
-                            Text(app.settings.model.isEmpty ? app.vendorName : "\(app.vendorName) · \(app.settings.model)")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    HStack {
-                        Group {
-                            if app.apiKey.isEmpty {
-                                TextField("粘贴 API Key", text: $app.apiKey)
-                            } else {
-                                SecureField("API Key", text: $app.apiKey)
-                            }
-                        }
-                        .font(.system(.subheadline, design: .monospaced))
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onChange(of: app.apiKey) { _, _ in app.saveKey() }
-                    }
-                    if let v = app.vendor, !v.keyURL.isEmpty {
-                        Link(destination: URL(string: v.keyURL)!) {
-                            HStack(spacing: 6) {
-                                EchoIcon("arrow.up.right.square", size: 14)
-                                Text("去 \(v.name) 控制台创建 Key")
-                            }
-                            .font(.footnote)
-                        }
-                    }
-                    if let v = app.vendor, !v.note.isEmpty {
-                        Text(v.note).font(.footnote).foregroundStyle(.secondary)
-                    }
-                }
+                    Text("先填一个 Key，就能开工。")
+                        .font(Hand.display(32))
+                        .foregroundStyle(Ink.line)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Section {
+                    Text("Echo 跑在你自己手机上：会话、文件、Key 都不经过我们的服务器；调用模型时直连你选的那家厂商，图片会以 base64 发给它做识别。")
+                        .font(Hand.body(15))
+                        .foregroundStyle(Ink.gray)
+                        .lineSpacing(5)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HandRow(glyph: .sparkle, title: "厂商与模型",
+                            value: app.settings.model.isEmpty ? app.vendorName : app.settings.model,
+                            valueAccent: true) { showModel = true }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            HandIcon(glyph: .sparkle, size: 15, color: Ink.gray, seed: 991)
+                            Group {
+                                if app.apiKey.isEmpty {
+                                    TextField("粘贴 API Key", text: $app.apiKey)
+                                } else {
+                                    SecureField("API Key", text: $app.apiKey)
+                                }
+                            }
+                            .font(Hand.mono(14))
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .onChange(of: app.apiKey) { _, _ in app.saveKey() }
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(height: 46)
+                        .sketch(seed: 992, capsule: true, double: true)
+
+                        if let v = app.vendor, let url = URL(string: v.keyURL) {
+                            Button { UIApplication.shared.open(url) } label: {
+                                HStack(spacing: 6) {
+                                    HandIcon(glyph: .sparkle, size: 13, color: Ink.accent, seed: 993)
+                                    Text("去 \(v.name) 控制台创建 Key")
+                                        .font(Hand.body(14))
+                                        .foregroundStyle(Ink.accent)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        if let v = app.vendor, !v.note.isEmpty {
+                            Text(v.note).font(Hand.body(12)).foregroundStyle(Ink.gray)
+                        }
+                    }
+
                     InkButton("开始使用", style: .prominent) {
                         app.apiKey = app.apiKey.trimmed
                         app.saveKey()
                         app.save()
                         onDone()
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                } footer: {
+                    .padding(.top, 8)
+
                     Text("Key 只存本机钥匙串，切厂商不会丢。没 Key 也可以先跳过，进去后随时填。")
+                        .font(Hand.pencil(15))
+                        .foregroundStyle(Ink.faint)
+
+                    Spacer(minLength: 30)
                 }
+                .padding(.horizontal, Gutter.edge)
             }
-            .navigationTitle("欢迎")
-            .navigationBarTitleDisplayMode(.large)
+            .scrollIndicators(.hidden)
+            .background(Ink.paper.ignoresSafeArea())
+            .overlay { PaperGrain(density: 400).ignoresSafeArea() }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("跳过") { onDone() }.foregroundStyle(.secondary)
+                    Button("跳过") { onDone() }
+                        .font(Hand.body(15))
+                        .foregroundStyle(Ink.gray)
                 }
             }
+            .toolbarBackground(Ink.paper, for: .navigationBar)
             .sheet(isPresented: $showModel) { ModelPickerSheet() }
         }
     }

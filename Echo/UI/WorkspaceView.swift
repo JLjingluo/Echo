@@ -22,42 +22,76 @@ struct WorkspaceView: View {
         NavigationStack {
             Group {
                 if files.isEmpty {
-                    ContentUnavailableCompat(title: "工作区还是空的",
-                                             sub: "让 Agent 生成文件后，会出现在这里",
-                                             icon: "folder")
-                } else {
-                    List {
-                        ForEach(filtered) { f in
-                            row(f)
-                        }
+                    VStack(spacing: 14) {
+                        BrandFace(size: 64, seed: 970)
+                        Text("工作区还是空的")
+                            .font(Hand.display(22))
+                            .foregroundStyle(Ink.line)
+                        Text("让 Agent 生成文件后，会出现在这里。")
+                            .font(Hand.pencil(17))
+                            .foregroundStyle(Ink.gray)
                     }
-                    .listStyle(.insetGrouped)
-                    .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
-                                prompt: "搜索文件")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            HandSearchField(text: $query, prompt: "搜索文件")
+                                .padding(.vertical, 10)
+                            ForEach(filtered) { f in row(f) }
+                            Spacer(minLength: 30)
+                        }
+                        .padding(.horizontal, Gutter.edge)
+                    }
+                    .scrollIndicators(.hidden)
                 }
             }
             .navigationTitle("工作区")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Ink.paper, for: .navigationBar)
+            .background(Ink.paper.ignoresSafeArea())
+            .overlay { PaperGrain(density: 400).ignoresSafeArea() }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("完成") { dismiss() }
+                    Button { dismiss() } label: {
+                        HandIcon(glyph: .close, size: 15, color: Ink.line, seed: 975)
+                            .frame(width: 34, height: 34)
+                            .overlay(SketchCircle(seed: 976)
+                                .stroke(Ink.line, lineWidth: 1.5))
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("导出全部到「文件」App", systemImage: "folder") { exportAll() }
-                        Button("分享全部", systemImage: "square.and.arrow.up") { shareAll() }
-                        Divider()
-                        Button("清空工作区", systemImage: "trash", role: .destructive) { confirmWipe = true }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                    HStack(spacing: 0) {
+                        Button(action: exportAll) {
+                            HandIcon(glyph: .folder, size: 18, color: Ink.line, seed: 977)
+                                .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
+                        SketchRect(seed: 978, corner: 1)
+                            .stroke(Ink.faint, lineWidth: 1)
+                            .frame(width: 1.2, height: 16)
+                        Button(action: shareAll) {
+                            HandIcon(glyph: .send, size: 17, color: Ink.line, seed: 979)
+                                .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
+                        SketchRect(seed: 980, corner: 1)
+                            .stroke(Ink.faint, lineWidth: 1)
+                            .frame(width: 1.2, height: 16)
+                        Button { confirmWipe = true } label: {
+                            HandIcon(glyph: .trash, size: 17, color: Ink.danger, seed: 981)
+                                .frame(width: 40, height: 40)
+                        }
+                        .buttonStyle(.plain)
                     }
+                    .frame(height: 44)
+                    .sketch(seed: 982, capsule: true, double: true)
                 }
             }
             .safeAreaInset(edge: .bottom) {
                 HStack {
                     Text("\(files.count) 个文件 · \(ToolOutcome.sizeText(files.reduce(0) { $0 + $1.size }))")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .font(Hand.mono(12))
+                        .foregroundStyle(Ink.gray)
                     Spacer()
                 }
                 .padding(.horizontal, 18)
@@ -99,32 +133,49 @@ struct WorkspaceView: View {
     }
 
     private func row(_ f: WorkspaceFile) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon(f.name))
-                .font(.system(size: 17))
-                .foregroundStyle(.secondary)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(f.name).font(.system(size: 16)).lineLimit(1)
-                Text("\(f.sizeText) · \(Self.dateFmt.string(from: f.modified))")
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                HandIcon(glyph: f.isDir ? .folder : fileGlyph(f.name), size: 19,
+                         color: Ink.gray, seed: 985)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(f.name)
+                        .font(Hand.body(16))
+                        .foregroundStyle(Ink.line)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text("\(f.sizeText) · \(Self.dateFmt.string(from: f.modified))")
+                        .font(Hand.mono(11))
+                        .foregroundStyle(Ink.faint)
+                }
+                Spacer()
+                HandIcon(glyph: .chevron, size: 12, color: Ink.faint, seed: 986)
+                    .rotationEffect(.degrees(-90))
             }
-            Spacer()
+            .frame(minHeight: 54)
+            SketchRect(seed: 987, corner: 1, wobble: 0.6)
+                .stroke(Ink.faint.opacity(0.4), lineWidth: 1)
+                .frame(height: 1)
+                .padding(.leading, 36)
         }
         .contentShape(Rectangle())
         .onTapGesture {
             preview = RunFile(name: f.name, path: f.url.path, size: f.size, preview: "")
-        }
-        .swipeActions {
-            Button("删除", role: .destructive) { confirmDelete = f }
-            Button("重命名") { renameText = f.name; renameTarget = f }
-                .tint(Color(hex: "8A8F99"))
         }
         .contextMenu {
             Button("分享", systemImage: "square.and.arrow.up") { ShareHelper.share(items: [f.url]) }
             Button("导出到「文件」App", systemImage: "folder") { exportURLs = [f.url] }
             Button("重命名", systemImage: "pencil") { renameText = f.name; renameTarget = f }
             Button("删除", role: .destructive) { confirmDelete = f }
+        }
+    }
+
+    private func fileGlyph(_ name: String) -> HandGlyph {
+        switch icon(name) {
+        case "globe", "curlybraces", "tablecells": return .search
+        case "folder": return .folder
+        case "trash": return .trash
+        default: return .doc
         }
     }
 
