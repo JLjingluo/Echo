@@ -361,6 +361,62 @@ extension View {
     }
 }
 
+// MARK: - Paper: grid + grain
+
+struct PaperGrid: View {
+    var cell: CGFloat = 26
+    var opacity: Double = 0.05
+    var seed: UInt64 = 0x9E37
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Canvas { ctx, sz in
+            let color: Color = scheme == .dark ? .white : .black
+            var p = Path()
+            var x: CGFloat = cell
+            var i = 0
+            while x < sz.width {
+                p.move(to: CGPoint(x: x + wob(seed, i * 4, 0.5), y: 0))
+                var y: CGFloat = 0
+                while y < sz.height {
+                    y += 46
+                    p.addLine(to: CGPoint(x: x + wob(seed, i * 4 &+ Int(y), 0.5), y: y))
+                }
+                x += cell
+                i += 1
+            }
+            var y: CGFloat = cell
+            i = 0
+            while y < sz.height {
+                p.move(to: CGPoint(x: 0, y: y + wob(seed, i * 4 &+ 7, 0.5)))
+                var x2: CGFloat = 0
+                while x2 < sz.width {
+                    x2 += 46
+                    p.addLine(to: CGPoint(x: x2, y: y + wob(seed, i * 4 &+ Int(x2) &+ 7, 0.5)))
+                }
+                y += cell
+                i += 1
+            }
+            ctx.stroke(p, with: .color(color), lineWidth: 0.6)
+        }
+        .opacity(scheme == .dark ? opacity * 1.25 : opacity)
+        .allowsHitTesting(false)
+    }
+}
+
+struct PaperBackground: View {
+    var grid = true
+
+    var body: some View {
+        ZStack {
+            Ink.paper
+            if grid { PaperGrid() }
+            PaperGrain(density: 500)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 // MARK: - Composite hand-drawn controls
 
 struct HandToggle: View {

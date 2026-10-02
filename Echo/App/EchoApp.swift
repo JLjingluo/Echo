@@ -154,8 +154,7 @@ struct OnboardView: View {
                 .padding(.horizontal, Gutter.edge)
             }
             .scrollIndicators(.hidden)
-            .background(Ink.paper.ignoresSafeArea())
-            .overlay { PaperGrain(density: 400).ignoresSafeArea() }
+            .background(PaperBackground().ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("跳过") { onDone() }

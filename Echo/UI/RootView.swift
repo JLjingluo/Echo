@@ -15,14 +15,14 @@ struct RootView: View {
         GeometryReader { geo in
             let w = max(geo.size.width * fraction, 1)
             ZStack(alignment: .leading) {
-                Ink.paper.ignoresSafeArea()
+                PaperBackground().ignoresSafeArea()
                 PaperGrain().ignoresSafeArea()
 
                 SidebarView(current: $current, progress: $progress, open: $open,
                             sessions: sessions, reveal: w)
                     .frame(width: w)
                     .frame(maxHeight: .infinity, alignment: .leading)
-                    .background(Ink.paper)
+                    .background(PaperBackground())
                     .scaleEffect(0.96 + 0.04 * progress, anchor: .leading)
                     .allowsHitTesting(progress > 0.001)
 
@@ -68,7 +68,7 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Ink.paper)
+        .background(PaperBackground())
         .clipShape(shape)
         .overlay {
             if progress > 0.001 {

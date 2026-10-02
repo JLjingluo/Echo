@@ -101,8 +101,7 @@ struct ComposerOptionsSheet: View {
                 .padding(.horizontal, Gutter.edge)
             }
             .scrollIndicators(.hidden)
-            .background(Ink.paper.ignoresSafeArea())
-            .overlay { PaperGrain(density: 400).ignoresSafeArea() }
+            .background(PaperBackground().ignoresSafeArea())
             .navigationTitle("对话选项")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Ink.paper, for: .navigationBar)

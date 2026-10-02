@@ -153,8 +153,7 @@ struct ModelPickerSheet: View {
                 .padding(.horizontal, Gutter.edge)
             }
             .scrollIndicators(.hidden)
-            .background(Ink.paper.ignoresSafeArea())
-            .overlay { PaperGrain(density: 400).ignoresSafeArea() }
+            .background(PaperBackground().ignoresSafeArea())
             .navigationTitle("厂商与模型")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Ink.paper, for: .navigationBar)

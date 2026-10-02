@@ -48,8 +48,7 @@ struct WorkspaceView: View {
             .navigationTitle("工作区")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Ink.paper, for: .navigationBar)
-            .background(Ink.paper.ignoresSafeArea())
-            .overlay { PaperGrain(density: 400).ignoresSafeArea() }
+            .background(PaperBackground().ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: {

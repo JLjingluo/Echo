@@ -126,7 +126,7 @@ struct EmptyState: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Ink.paper)
+        .background(PaperBackground())
         .onAppear { greeting = EchoWheel.greeting() }
     }
 }

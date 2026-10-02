@@ -107,8 +107,7 @@ struct ChatView: View {
                      onOpenSettings: { showSettings = true })
         }
         .padding(.bottom, 5)
-        .background(Ink.paper.ignoresSafeArea())
-        .overlay { PaperGrain(density: 500).ignoresSafeArea() }
+        .background(PaperBackground().ignoresSafeArea())
         .onAppear { runtime.persistIfNeeded(session: session, context: context) }
         .onChange(of: runtime.phase) { _, newPhase in
             guard newPhase == .done, app.settings.autoExport else { return }
