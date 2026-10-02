@@ -136,7 +136,7 @@ struct OnboardView: View {
                 }
 
                 Section {
-                    EchoGlassButton("开始使用", style: .prominent) {
+                    InkButton("开始使用", style: .prominent) {
                         app.apiKey = app.apiKey.trimmed
                         app.saveKey()
                         app.save()

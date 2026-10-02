@@ -42,7 +42,9 @@ private func sampled(_ base: Path, count: Int, seed: UInt64, amp: CGFloat) -> [C
     for i in 0..<count {
         let t = CGFloat(i) / CGFloat(count)
         if let p = base.trimmedPath(from: 0, to: max(t, 0.001)).currentPoint {
-            pts.append(CGPoint(x: p.x + wob(seed, i * 2, amp), y: p.y + wob(seed, i * 2 + 1, amp)))
+            let spike = (mix(seed &+ UInt64(truncatingIfNeeded: i)) % 13) == 0 ? 2.6 : 1
+            pts.append(CGPoint(x: p.x + wob(seed, i * 2, amp * CGFloat(spike)),
+                               y: p.y + wob(seed, i * 2 + 1, amp * CGFloat(spike))))
         }
     }
     return pts
@@ -69,7 +71,7 @@ private func closed(_ pts: [CGPoint], skip: Int? = nil) -> Path {
 struct SketchRect: Shape {
     var seed: UInt64 = 1
     var corner: CGFloat = 14
-    var wobble: CGFloat = 1.3
+    var wobble: CGFloat = 0.5
     var gap: Int? = nil
 
     func path(in r: CGRect) -> Path {
@@ -82,7 +84,7 @@ struct SketchRect: Shape {
 
 struct SketchCircle: Shape {
     var seed: UInt64 = 2
-    var wobble: CGFloat = 1.2
+    var wobble: CGFloat = 0.45
     var open: Bool = true
 
     func path(in r: CGRect) -> Path {
@@ -103,7 +105,7 @@ struct SketchCircle: Shape {
 
 struct SketchCapsule: Shape {
     var seed: UInt64 = 3
-    var wobble: CGFloat = 1.3
+    var wobble: CGFloat = 0.5
     var gap: Int? = nil
 
     func path(in r: CGRect) -> Path {
@@ -134,8 +136,8 @@ struct Hatch: Shape {
 
 struct SketchBox: Shape {
     var seed: UInt64 = 1
-    var wobble: CGFloat = 1.2
-    var overshoot: CGFloat = 2.6
+    var wobble: CGFloat = 0.45
+    var overshoot: CGFloat = 1.6
     var gapSide: Int? = nil
 
     func path(in r: CGRect) -> Path {
@@ -157,8 +159,8 @@ struct SketchBox: Shape {
                                 y: a.y - uy * overshoot + j(side * 5 + 1))
             let end = CGPoint(x: c.x + ux * overshoot + j(side * 5 + 2),
                               y: c.y + uy * overshoot + j(side * 5 + 3))
-            let mid = CGPoint(x: (start.x + end.x) / 2 + j(side * 5 + 4) * 1.6,
-                              y: (start.y + end.y) / 2 + j(side * 5 + 9) * 1.6)
+            let mid = CGPoint(x: (start.x + end.x) / 2 + j(side * 5 + 4) * 1.0,
+                              y: (start.y + end.y) / 2 + j(side * 5 + 9) * 1.0)
             p.move(to: start)
             p.addQuadCurve(to: end, control: mid)
         }
@@ -342,7 +344,7 @@ struct BoxBorder: ViewModifier {
             SketchBox(seed: seed, gapSide: gapSide)
                 .stroke(color, style: StrokeStyle(lineWidth: width, lineCap: .round))
             if double {
-                SketchBox(seed: seed &+ 9, wobble: 1.5, overshoot: 1.8, gapSide: gapSide)
+                SketchBox(seed: seed &+ 9, wobble: 0.6, overshoot: 1.2, gapSide: gapSide)
                     .stroke(color.opacity(0.22),
                             style: StrokeStyle(lineWidth: width * 0.7, lineCap: .round))
                     .offset(x: 1.3, y: -1.0)
@@ -569,7 +571,7 @@ struct TechLabel: View {
             }
         }
         .overlay(alignment: .bottom) {
-            SketchRect(seed: 77, corner: 2, wobble: 1.0)
+            SketchRect(seed: 77, corner: 2, wobble: 0.5)
                 .stroke(Ink.faint, style: StrokeStyle(lineWidth: 1.1, lineCap: .round))
                 .offset(x: -3, y: 3)
         }

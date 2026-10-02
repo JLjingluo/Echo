@@ -73,7 +73,7 @@ struct RootView: View {
         .overlay {
             if progress > 0.001 {
                 SketchRect(seed: dragging ? UInt64(Int(progress * 26)) : 900,
-                           corner: 26, wobble: dragging ? 2.2 : 1.3)
+                           corner: 26, wobble: dragging ? 0.9 : 0.5)
                     .stroke(Ink.line.opacity(0.75 * progress),
                             style: StrokeStyle(lineWidth: 1.7, lineCap: .round))
             }
@@ -365,7 +365,7 @@ struct SelectionLoop: View {
     @State private var p: CGFloat = 0
 
     var body: some View {
-        RedrawStroke(shape: SketchRect(seed: 621, corner: 14, wobble: 1.7),
+        RedrawStroke(shape: SketchRect(seed: 621, corner: 14, wobble: 0.7),
                      color: Ink.accent, width: 1.6, progress: p)
             .onAppear {
                 guard !reduceMotion else { p = 1; return }

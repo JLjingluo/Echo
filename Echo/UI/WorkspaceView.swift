@@ -62,7 +62,11 @@ struct WorkspaceView: View {
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 8)
-                .background(.bar)
+                .background(Ink.paper)
+                .overlay(alignment: .top) {
+                    SketchRect(seed: 66, corner: 1)
+                        .stroke(Ink.faint, lineWidth: 1)
+                }
             }
             .overlay {
                 if !exportURLs.isEmpty {

@@ -200,7 +200,7 @@ struct EchoSurface<Content: View>: View {
     }
 }
 
-struct EchoGlassButton: View {
+struct InkButton: View {
     enum Style { case regular, prominent }
 
     let title: String?

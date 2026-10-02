@@ -44,8 +44,6 @@ targets:
           - Caveat.ttf
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
         NSCameraUsageDescription: 拍照后让 AI 识别图中内容
         NSPhotoLibraryUsageDescription: 选择图片交给 AI 分析
         NSMicrophoneUsageDescription: 语音输入转成文字发给 AI
