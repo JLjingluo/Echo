@@ -127,7 +127,7 @@ struct ComposerOptionsSheet: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 84)
-            .sketch(seed: 961, corner: 14, double: true, gapSide: 3)
+            .sketch(seed: 961, corner: 14, double: true, gap: 3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
