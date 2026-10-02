@@ -46,16 +46,12 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        UISupportedInterfaceOrientations~ipad:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
         NSCameraUsageDescription: 拍照后让 AI 识别图中内容
         NSPhotoLibraryUsageDescription: 选择图片交给 AI 分析
         NSMicrophoneUsageDescription: 语音输入转成文字发给 AI
         NSSpeechRecognitionUsageDescription: 将你的语音识别为文字
         ITSAppUsesNonExemptEncryption: false
+        LSApplicationCategoryType: public.app-category.productivity
         CFBundleLocalizations:
           - zh-Hans
 

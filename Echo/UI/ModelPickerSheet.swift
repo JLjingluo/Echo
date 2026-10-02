@@ -189,8 +189,8 @@ struct ModelPickerSheet: View {
 
     private func detailText(_ m: ModelEntry) -> String {
         if NoToolMemory.contains(m.id) {
-            return m.owner.isEmpty ? "曾被记为不能调工具，选它即清除"
-                : "\(m.owner) · 曾被记为不能调工具，选它即清除"
+            return m.owner.isEmpty ? "曾被记为不调工具 · 选它可清除"
+                : "\(m.owner) · 曾被记为不调工具 · 选它可清除"
         }
         return m.owner
     }
